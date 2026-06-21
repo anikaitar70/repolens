@@ -1,3 +1,4 @@
+import concurrent.futures
 import tempfile
 import zipfile
 from pathlib import Path
@@ -41,6 +42,12 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _run_analysis_with_timeout(zip_path: Path, filename: str) -> AnalysisResponse:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(analyze_zip, zip_path, filename)
+        return future.result(timeout=settings.max_analysis_seconds)
+
+
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze(file: UploadFile = File(...)) -> AnalysisResponse:
     if not file.filename or not file.filename.lower().endswith(".zip"):
@@ -68,13 +75,19 @@ async def analyze(file: UploadFile = File(...)) -> AnalysisResponse:
         tmp_path = Path(tmp.name)
 
     try:
-        result = analyze_zip(tmp_path, file.filename)
+        result = _run_analysis_with_timeout(tmp_path, file.filename)
         logger.info(
             "Analysis completed for %s: %d findings",
             result.repository_name,
             len(result.findings),
         )
         return result
+    except concurrent.futures.TimeoutError:
+        logger.warning("Analysis timed out for upload: %s", file.filename)
+        raise HTTPException(
+            status_code=504,
+            detail=f"Analysis exceeded time limit of {settings.max_analysis_seconds} seconds.",
+        ) from None
     except zipfile.BadZipFile:
         logger.warning("Invalid ZIP upload: %s", file.filename)
         raise HTTPException(status_code=400, detail="Invalid ZIP file.") from None
