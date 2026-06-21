@@ -4,6 +4,7 @@ import { useState } from "react";
 import { analyzeRepository } from "@/lib/api";
 import type { AnalysisResult, AnalysisState } from "@/types/analysis";
 import AnalysisProgress from "@/components/AnalysisProgress";
+import CategoryBreakdown from "@/components/CategoryBreakdown";
 import AuditReport from "@/components/AuditReport";
 import FindingsTable from "@/components/FindingsTable";
 import Hero from "@/components/Hero";
@@ -88,6 +89,7 @@ export default function HomePage() {
               scores={result.scores}
               repositoryName={result.repository_name}
             />
+            <CategoryBreakdown metrics={result.metrics} />
             <FindingsTable findings={result.findings} />
             <AuditReport report={result.ai_report} />
           </div>
