@@ -11,6 +11,13 @@ export interface DeadCodeSummary {
   unused_functions: number;
 }
 
+export interface DuplicateLogicSummary {
+  duplicate_pairs: number;
+  high_confidence_duplicates: number;
+  medium_confidence_duplicates: number;
+  possible_duplicates: number;
+}
+
 export interface Metrics {
   files_scanned: number;
   total_lines: number;
@@ -20,6 +27,7 @@ export interface Metrics {
   findings_count: number;
   findings_by_category: Record<string, number>;
   dead_code_summary: DeadCodeSummary;
+  duplicate_logic_summary: DuplicateLogicSummary;
 }
 
 export interface Finding {
@@ -32,6 +40,11 @@ export interface Finding {
   message: string;
   confidence?: string;
   evidence?: Record<string, unknown>;
+  file_a?: string;
+  function_a?: string;
+  file_b?: string;
+  function_b?: string;
+  similarity?: number;
 }
 
 export type FindingCategory =
@@ -40,6 +53,8 @@ export type FindingCategory =
   | "security"
   | "architecture"
   | "dead_code";
+
+export type DuplicateSortKey = "similarity" | "confidence" | "severity";
 
 export interface AnalysisResult {
   repository_name: string;

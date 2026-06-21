@@ -64,6 +64,11 @@ export function normalizeFinding(raw: RawFinding, index: number): Finding {
       ...(raw.issue ? { issue: raw.issue } : {}),
       ...(raw.chain ? { chain: raw.chain } : {}),
     },
+    file_a: raw.file_a,
+    function_a: raw.function_a,
+    file_b: raw.file_b,
+    function_b: raw.function_b,
+    similarity: raw.similarity,
   };
 }
 
@@ -89,6 +94,12 @@ export function normalizeAnalysisResult(data: AnalysisResult): AnalysisResult {
       unused_imports: 0,
       unused_variables: 0,
       unused_functions: 0,
+    },
+    duplicate_logic_summary: data.metrics?.duplicate_logic_summary ?? {
+      duplicate_pairs: 0,
+      high_confidence_duplicates: 0,
+      medium_confidence_duplicates: 0,
+      possible_duplicates: 0,
     },
   };
 

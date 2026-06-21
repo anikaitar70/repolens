@@ -5,6 +5,7 @@ import { analyzeRepository } from "@/lib/api";
 import type { AnalysisResult, AnalysisState } from "@/types/analysis";
 import AnalysisProgress from "@/components/AnalysisProgress";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
+import DuplicateLogicTable from "@/components/DuplicateLogicTable";
 import AuditReport from "@/components/AuditReport";
 import FindingsTable from "@/components/FindingsTable";
 import Hero from "@/components/Hero";
@@ -90,6 +91,10 @@ export default function HomePage() {
               repositoryName={result.repository_name}
             />
             <CategoryBreakdown metrics={result.metrics} />
+            <DuplicateLogicTable
+              findings={result.findings}
+              summary={result.metrics.duplicate_logic_summary}
+            />
             <FindingsTable findings={result.findings} />
             <AuditReport report={result.ai_report} />
           </div>

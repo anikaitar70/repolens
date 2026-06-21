@@ -25,6 +25,8 @@ export default function CategoryBreakdown({ metrics }: CategoryBreakdownProps) {
         Dead code: {metrics.dead_code_summary?.unused_imports ?? 0} imports,{" "}
         {metrics.dead_code_summary?.unused_variables ?? 0} variables,{" "}
         {metrics.dead_code_summary?.unused_functions ?? 0} functions
+        {" · "}
+        Duplicates: {metrics.duplicate_logic_summary?.duplicate_pairs ?? 0} pairs
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {categories.map(([category, count]) => (
