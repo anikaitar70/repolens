@@ -22,17 +22,27 @@ Rules:
   2. Security Assessment
   3. Maintainability Assessment
   4. Dead Code Assessment
-  5. Architecture Assessment
-  6. Prioritized Refactoring Plan
+  5. Duplicate Logic Assessment
+  6. Architecture Assessment
+  7. Prioritized Refactoring Plan
 - Reference specific finding IDs or messages when discussing issues.
 - Be concise but actionable.
 """
 
-_GEMINI_FINDING_FIELDS = ("id", "type", "severity", "category", "file", "line", "message", "confidence")
+_GEMINI_FINDING_FIELDS = (
+    "id", "type", "severity", "category", "file", "line", "message", "confidence",
+    "file_a", "function_a", "file_b", "function_b", "similarity",
+)
 
 
 def _trim_finding(finding: dict) -> dict:
-    return {key: finding[key] for key in _GEMINI_FINDING_FIELDS if key in finding}
+    trimmed = {key: finding[key] for key in _GEMINI_FINDING_FIELDS if key in finding}
+    if finding.get("type") == "duplicate_logic" and "evidence" in finding:
+        evidence = finding["evidence"]
+        for key in ("file_a", "function_a", "file_b", "function_b", "similarity"):
+            if key in evidence and key not in trimmed:
+                trimmed[key] = evidence[key]
+    return trimmed
 
 
 def _build_gemini_payload(
@@ -51,9 +61,15 @@ def _build_gemini_payload(
             "findings_count": findings_count,
             "findings_by_category": metrics.get("findings_by_category", {}),
             "dead_code_summary": metrics.get("dead_code_summary", {}),
+            "duplicate_logic_summary": metrics.get("duplicate_logic_summary", {}),
         },
         "scores": scores,
         "top_findings": [_trim_finding(f) for f in top_findings[: settings.gemini_top_findings_limit]],
+        "top_duplicate_findings": [
+            _trim_finding(f)
+            for f in top_findings
+            if f.get("type") == "duplicate_logic"
+        ][:5],
     }
 
 
@@ -153,9 +169,9 @@ def _fallback_report(
         lines.append("No security issues detected.")
 
     lines.extend(["", "## Maintainability Assessment", ""])
-    maintainability = _category_findings(findings, "maintainability")
+    maintainability = [f for f in findings if f.get("category") == "maintainability" and f.get("type") != "duplicate_logic"]
     if maintainability:
-        for item in maintainability:
+        for item in maintainability[:8]:
             lines.append(f"- {item.get('message')}")
     else:
         lines.append("No maintainability issues detected.")
@@ -169,6 +185,21 @@ def _fallback_report(
     dead = _category_findings(findings, "dead_code")
     for item in dead[:8]:
         lines.append(f"- {item.get('message')}")
+
+    lines.extend(["", "## Duplicate Logic Assessment", ""])
+    duplicate_items = [f for f in findings if f.get("type") == "duplicate_logic"]
+    dup_summary = metrics.get("duplicate_logic_summary", {})
+    lines.append(
+        f"Duplicate pairs: **{dup_summary.get('duplicate_pairs', 0)}** "
+        f"(high: {dup_summary.get('high_confidence_duplicates', 0)}, "
+        f"medium: {dup_summary.get('medium_confidence_duplicates', 0)}, "
+        f"possible: {dup_summary.get('possible_duplicates', 0)})."
+    )
+    if duplicate_items:
+        for item in duplicate_items[:8]:
+            lines.append(f"- {item.get('message')}")
+    else:
+        lines.append("No semantic duplicate logic detected.")
 
     lines.extend(["", "## Architecture Assessment", ""])
     architecture = _category_findings(findings, "architecture")

@@ -13,6 +13,14 @@ def compute_scores(findings: list[dict]) -> dict[str, int]:
             maintainability -= 2
         elif ftype == "complexity":
             maintainability -= 3
+        elif ftype == "duplicate_logic":
+            confidence = finding.get("confidence", "low")
+            if confidence == "high":
+                maintainability -= 4
+            elif confidence == "medium":
+                maintainability -= 2
+            else:
+                maintainability -= 1
         elif ftype == "security":
             security -= 10
         elif ftype in {"architecture", "circular_dependency"}:

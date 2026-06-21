@@ -9,6 +9,13 @@ class DeadCodeSummary(BaseModel):
     unused_functions: int = 0
 
 
+class DuplicateLogicSummary(BaseModel):
+    duplicate_pairs: int = 0
+    high_confidence_duplicates: int = 0
+    medium_confidence_duplicates: int = 0
+    possible_duplicates: int = 0
+
+
 class Scores(BaseModel):
     maintainability: int
     security: int
@@ -25,6 +32,7 @@ class Metrics(BaseModel):
     findings_count: int
     findings_by_category: dict[str, int] = Field(default_factory=dict)
     dead_code_summary: DeadCodeSummary = Field(default_factory=DeadCodeSummary)
+    duplicate_logic_summary: DuplicateLogicSummary = Field(default_factory=DuplicateLogicSummary)
 
 
 class AnalysisResponse(BaseModel):

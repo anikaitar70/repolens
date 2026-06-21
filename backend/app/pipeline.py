@@ -7,6 +7,7 @@ from app.analysis_context import AnalysisContext
 from app.analyzers.circular_import import detect_circular_imports
 from app.analyzers.complexity import analyze_complexity
 from app.analyzers.dead_code import analyze_dead_code
+from app.analyzers.duplicate_logic import detect_duplicate_logic
 from app.analyzers.large_file import detect_large_files
 from app.analyzers.large_function import detect_large_functions
 from app.analyzers.security import detect_security_issues
@@ -15,10 +16,21 @@ from app.exceptions import AnalysisError, InvalidUploadError, RepoLensError
 from app.extract import safe_extract_zip
 from app.gemini_client import generate_report
 from app.logging_config import get_logger
-from app.models import AnalysisResponse, DeadCodeSummary, Metrics, Scores
+from app.models import (
+    AnalysisResponse,
+    DeadCodeSummary,
+    DuplicateLogicSummary,
+    Metrics,
+    Scores,
+)
 from app.scanner import compute_metrics, scan_repository
 from app.scoring import compute_scores
-from app.summary import build_dead_code_summary, build_findings_by_category, top_findings
+from app.summary import (
+    build_dead_code_summary,
+    build_duplicate_logic_summary,
+    build_findings_by_category,
+    top_findings,
+)
 
 logger = get_logger(__name__)
 
@@ -71,28 +83,29 @@ def analyze_zip(zip_path: Path, original_filename: str) -> AnalysisResponse:
         findings.extend(detect_security_issues(ctx))
         findings.extend(detect_circular_imports(ctx))
         findings.extend(analyze_dead_code(ctx))
+        findings.extend(detect_duplicate_logic(ctx))
 
         scores_dict = compute_scores(findings)
         dead_code_summary = build_dead_code_summary(findings)
+        duplicate_logic_summary = build_duplicate_logic_summary(findings)
         findings_by_category = build_findings_by_category(findings)
 
-        metrics_dict = {
-            **base_metrics,
-            "findings_count": len(findings),
-            "findings_by_category": findings_by_category,
-            "dead_code_summary": dead_code_summary,
-        }
-
         logger.info(
-            "Running analyzers for %s: files=%d findings=%d dead_code=%s",
+            "Running analyzers for %s: files=%d findings=%d duplicates=%s",
             repo_name,
             base_metrics["files_scanned"],
             len(findings),
-            dead_code_summary,
+            duplicate_logic_summary,
         )
 
         ai_report = generate_report(
-            metrics_dict,
+            {
+                **base_metrics,
+                "findings_count": len(findings),
+                "findings_by_category": findings_by_category,
+                "dead_code_summary": dead_code_summary,
+                "duplicate_logic_summary": duplicate_logic_summary,
+            },
             scores_dict,
             findings,
             top_findings(findings),
@@ -105,6 +118,7 @@ def analyze_zip(zip_path: Path, original_filename: str) -> AnalysisResponse:
                 findings_count=len(findings),
                 findings_by_category=findings_by_category,
                 dead_code_summary=DeadCodeSummary(**dead_code_summary),
+                duplicate_logic_summary=DuplicateLogicSummary(**duplicate_logic_summary),
             ),
             scores=Scores(**scores_dict),
             findings=findings,

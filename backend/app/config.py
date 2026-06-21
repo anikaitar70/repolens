@@ -3,7 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
@@ -20,8 +24,18 @@ class Settings(BaseSettings):
     max_single_file_size: int = Field(
         default=10_485_760, description="Max single extracted file size in bytes (10 MB)"
     )
-    max_analysis_seconds: int = Field(default=60, description="Max analysis runtime in seconds")
+    max_analysis_seconds: int = Field(default=120, description="Max analysis runtime in seconds")
     gemini_top_findings_limit: int = Field(default=15, description="Max findings sent to Gemini")
+
+    duplicate_detection_enabled: bool = True
+    duplicate_min_lines: int = 5
+    duplicate_length_bucket_size: int = 5
+    duplicate_max_functions: int = 300
+    duplicate_max_pairs: int = 50
+    duplicate_high_threshold: float = 0.95
+    duplicate_medium_threshold: float = 0.90
+    duplicate_possible_threshold: float = 0.85
+
     upload_directory: str = "/tmp/repolens/uploads"
 
     log_level: str = "INFO"
