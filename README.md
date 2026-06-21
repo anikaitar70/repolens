@@ -57,6 +57,17 @@ repolens/
 
 ### Backend
 
+**Windows (recommended):**
+
+```powershell
+.\scripts\setup-backend.ps1
+.\scripts\start-backend.ps1
+```
+
+Default port is **8080** because Windows often blocks port 8000 (`WinError 10013`).
+
+**Manual setup:**
+
 ```bash
 cd backend
 python -m venv venv
@@ -71,10 +82,18 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY (optional — fallback report works without it)
 
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8080
 ```
 
-API docs: http://localhost:8000/docs
+API docs: http://127.0.0.1:8080/docs
+
+#### Windows troubleshooting
+
+| Error | Fix |
+|-------|-----|
+| `Unable to copy venvlauncher.exe` | Delete `backend\venv`, then run `.\scripts\setup-backend.ps1`. Prefer Python from [python.org](https://www.python.org/downloads/) over the Microsoft Store. |
+| `[WinError 10013]` on port 8000 | Use port 8080: `.\scripts\start-backend.ps1 -Port 8080` or `-Port 9000` |
+| `python` not found | Use `py -3.12` instead of `python` |
 
 ### Frontend
 
@@ -108,7 +127,40 @@ App: http://localhost:3000
 
 | Variable              | Description           | Default                 |
 |-----------------------|-----------------------|-------------------------|
-| `NEXT_PUBLIC_API_URL` | Backend API base URL  | `http://localhost:8000` |
+| `NEXT_PUBLIC_API_URL` | Backend API base URL  | `http://127.0.0.1:8080` |
+
+## Sample Test Projects
+
+Complex sample repositories are included for manual testing:
+
+```
+samples/
+├── python-sample/          # Python project source
+├── python-sample.zip       # Ready to upload
+├── js-sample/
+├── js-sample.zip
+├── typescript-sample/
+└── typescript-sample.zip
+```
+
+Each sample intentionally includes issues for all analyzers:
+- Large files (>500 lines)
+- Large functions (>50 lines)
+- High cyclomatic complexity (Python)
+- Security patterns (hardcoded secrets, eval, innerHTML)
+- Circular import chains
+
+**Regenerate samples:**
+
+```bash
+python scripts/build_sample_projects.py
+```
+
+**Test with the API:**
+
+```powershell
+curl -X POST -F "file=@samples/python-sample.zip" http://127.0.0.1:8080/api/analyze
+```
 
 ## Docker
 
