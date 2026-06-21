@@ -1,0 +1,207 @@
+# RepoLens
+
+AI-assisted repository audit platform. Deterministic analyzers discover issues; Gemini converts structured findings into a professional audit report.
+
+**Philosophy:** Analysis first, AI second.
+
+## Features (Phase 1)
+
+- ZIP file upload (Python, JavaScript, TypeScript)
+- Large file detection (>500 lines)
+- Large function detection (>50 lines)
+- Cyclomatic complexity analysis (Python, via Radon)
+- Security pattern detection
+- Circular import detection
+- Category scoring (Maintainability, Security, Architecture)
+- AI-generated audit report (Gemini)
+
+## Tech Stack
+
+| Layer    | Technology              |
+|----------|-------------------------|
+| Frontend | Next.js 16, TypeScript, Tailwind CSS |
+| Backend  | FastAPI, Python 3.12    |
+| AI       | Google Gemini API       |
+
+## Project Structure
+
+```
+repolens/
+├── backend/
+│   ├── app/
+│   │   ├── analyzers/       # Static analysis modules
+│   │   ├── main.py          # FastAPI application
+│   │   ├── pipeline.py      # Analysis orchestration
+│   │   ├── scanner.py       # Repository traversal
+│   │   ├── scoring.py       # Score calculation
+│   │   └── gemini_client.py # Report generation
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── app/                 # Next.js App Router
+│   ├── components/          # UI components
+│   ├── lib/                 # API client
+│   └── Dockerfile
+├── docker-compose.yml
+└── README.md
+```
+
+## Local Development
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 20+
+- npm
+- (Optional) Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env and set GEMINI_API_KEY (optional — fallback report works without it)
+
+uvicorn app.main:app --reload --port 8000
+```
+
+API docs: http://localhost:8000/docs
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local
+
+npm run dev
+```
+
+App: http://localhost:3000
+
+### Environment Variables
+
+**Backend (`backend/.env`)**
+
+| Variable              | Description                          | Default |
+|-----------------------|--------------------------------------|---------|
+| `GEMINI_API_KEY`      | Google Gemini API key                | —       |
+| `GEMINI_MODEL`        | Gemini model name                    | `gemini-2.0-flash` |
+| `MAX_UPLOAD_SIZE`     | Max upload size in bytes             | `52428800` (50 MB) |
+| `MAX_EXTRACTED_SIZE`  | Max extracted archive size in bytes  | `209715200` (200 MB) |
+| `MAX_EXTRACTED_FILES` | Max files allowed in archive         | `10000` |
+| `UPLOAD_DIRECTORY`    | Temp directory for uploads           | `/tmp/repolens/uploads` |
+| `LOG_LEVEL`           | Logging level                        | `INFO` |
+| `CORS_ORIGINS`        | Comma-separated allowed origins      | `http://localhost:3000` |
+| `DEBUG`               | Expose internal errors when true     | `false` |
+
+**Frontend (`frontend/.env.local`)**
+
+| Variable              | Description           | Default                 |
+|-----------------------|-----------------------|-------------------------|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL  | `http://localhost:8000` |
+
+## Docker
+
+```bash
+# Optional: set Gemini API key
+export GEMINI_API_KEY=your_key_here
+
+docker compose up --build
+```
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+
+## API
+
+### `POST /api/analyze`
+
+Upload a ZIP file containing a source code repository.
+
+**Request:** `multipart/form-data` with field `file` (ZIP)
+
+**Response:**
+
+```json
+{
+  "repository_name": "my-project",
+  "metrics": {
+    "files_scanned": 42,
+    "total_lines": 8500,
+    "python_files": 20,
+    "javascript_files": 15,
+    "typescript_files": 7,
+    "findings_count": 12
+  },
+  "scores": {
+    "maintainability": 84,
+    "security": 90,
+    "architecture": 95
+  },
+  "findings": [],
+  "ai_report": "# Repository Audit Report\n..."
+}
+```
+
+## Scoring
+
+All categories start at 100 and deductions are applied per finding:
+
+| Finding Type       | Category         | Deduction |
+|--------------------|------------------|-----------|
+| Large file         | Maintainability  | -5        |
+| Large function     | Maintainability  | -2        |
+| Complexity         | Maintainability  | -3        |
+| Security issue     | Security         | -10       |
+| Circular dependency| Architecture     | -5        |
+
+Scores are clamped between 0 and 100.
+
+## Testing
+
+### Backend unit and API tests
+
+```bash
+cd backend
+venv\Scripts\activate          # Windows
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+**Expected results:**
+- `test_compute_scores_*` — scoring deductions and clamping pass
+- `test_safe_extract_*` — zip-slip blocked, valid archives extracted
+- `test_health_endpoint` — returns `{"status":"ok"}`
+- `test_analyze_valid_python_repo` — returns findings and scores for a sample ZIP
+
+### Manual API test
+
+```bash
+curl -X POST -F "file=@your-repo.zip" http://localhost:8000/api/analyze
+```
+
+## Security
+
+- ZIP uploads are validated for size and path traversal (zip-slip)
+- Extracted archives are size- and file-count-limited
+- Uploaded code is never executed — static analysis only
+
+## Ignored Directories
+
+The scanner automatically ignores:
+
+`node_modules`, `.git`, `dist`, `build`, `.next`, `coverage`, `venv`, `__pycache__`
+
+## License
+
+MIT

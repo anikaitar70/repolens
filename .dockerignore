@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/__pycache__
+**/venv
+**/.env
+**/.env.local
+**/node_modules
+**/.next
+*.zip
+sample_repo
+test_sample
