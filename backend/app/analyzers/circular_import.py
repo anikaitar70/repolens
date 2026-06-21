@@ -79,7 +79,12 @@ def _resolve_js_import(root: Path, source_file: Path, import_path: str) -> str |
     if not import_path.startswith("."):
         return None
 
-    base = (source_file.parent / import_path).resolve()
+    try:
+        base = (source_file.parent / import_path).resolve()
+        base.relative_to(root.resolve())
+    except ValueError:
+        return None
+
     candidates = [
         base,
         base.with_suffix(".js"),
