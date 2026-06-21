@@ -15,13 +15,14 @@ def test_compute_scores_applies_deductions():
         {"type": "large_function"},
         {"type": "complexity"},
         {"type": "security"},
-        {"type": "architecture"},
+        {"type": "circular_dependency"},
     ]
     scores = compute_scores(findings)
 
     assert scores["maintainability"] == 90
     assert scores["security"] == 90
     assert scores["architecture"] == 95
+    assert scores["dead_code"] == 100
 
 
 def test_compute_scores_clamps_at_zero():

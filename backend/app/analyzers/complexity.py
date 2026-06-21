@@ -1,17 +1,16 @@
-from pathlib import Path
-
 from radon.complexity import cc_visit
 
+from app.analysis_context import AnalysisContext
 from app.config import settings
-from app.scanner import relative_path
+from app.findings import create_finding
 
 
-def analyze_complexity(root: Path, files: list[Path]) -> list[dict]:
+def analyze_complexity(ctx: AnalysisContext) -> list[dict]:
     """Analyze cyclomatic complexity for Python files using Radon."""
     findings: list[dict] = []
     threshold = settings.complexity_threshold
 
-    for file_path in files:
+    for file_path in ctx.files:
         if file_path.suffix.lower() != ".py":
             continue
 
@@ -25,22 +24,27 @@ def analyze_complexity(root: Path, files: list[Path]) -> list[dict]:
         except Exception:
             continue
 
-        rel = relative_path(root, file_path)
+        rel = ctx.rel_path(file_path)
 
         for block in blocks:
             if block.complexity >= threshold:
                 findings.append(
-                    {
-                        "type": "complexity",
-                        "severity": "high",
-                        "function": block.name,
-                        "file": rel,
-                        "complexity": block.complexity,
-                        "description": (
+                    create_finding(
+                        type="complexity",
+                        severity="high",
+                        category="maintainability",
+                        file=rel,
+                        line=block.lineno,
+                        message=(
                             f"Function '{block.name}' has cyclomatic complexity "
                             f"{block.complexity} (threshold: {threshold})"
                         ),
-                    }
+                        evidence={
+                            "function": block.name,
+                            "complexity": block.complexity,
+                            "threshold": threshold,
+                        },
+                    )
                 )
 
     return findings

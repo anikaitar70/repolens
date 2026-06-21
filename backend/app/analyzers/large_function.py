@@ -1,9 +1,9 @@
 import ast
 import re
-from pathlib import Path
 
+from app.analysis_context import AnalysisContext
 from app.config import settings
-from app.scanner import relative_path
+from app.findings import create_finding
 
 JS_FUNCTION_PATTERN = re.compile(
     r"(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\([^)]*\)\s*\{",
@@ -19,9 +19,8 @@ JS_METHOD_PATTERN = re.compile(
 )
 
 
-def _python_functions(content: str, file_path: str) -> list[dict]:
+def _python_functions(content: str, file_path: str, threshold: int) -> list[dict]:
     findings: list[dict] = []
-    threshold = settings.large_function_threshold
 
     try:
         tree = ast.parse(content)
@@ -35,14 +34,15 @@ def _python_functions(content: str, file_path: str) -> list[dict]:
             lines = node.end_lineno - node.lineno + 1
             if lines > threshold:
                 findings.append(
-                    {
-                        "type": "large_function",
-                        "severity": "medium",
-                        "function": node.name,
-                        "file": file_path,
-                        "lines": lines,
-                        "description": f"Function '{node.name}' is {lines} lines (threshold: {threshold})",
-                    }
+                    create_finding(
+                        type="large_function",
+                        severity="medium",
+                        category="maintainability",
+                        file=file_path,
+                        line=node.lineno,
+                        message=f"Function '{node.name}' is {lines} lines (threshold: {threshold})",
+                        evidence={"function": node.name, "lines": lines, "threshold": threshold},
+                    )
                 )
 
     return findings
@@ -60,11 +60,9 @@ def _find_matching_brace(content: str, open_index: int) -> int | None:
     return None
 
 
-def _js_functions(content: str, file_path: str) -> list[dict]:
+def _js_functions(content: str, file_path: str, threshold: int) -> list[dict]:
     findings: list[dict] = []
-    threshold = settings.large_function_threshold
     seen: set[tuple[str, int]] = set()
-
     patterns = [JS_FUNCTION_PATTERN, JS_ARROW_PATTERN, JS_METHOD_PATTERN]
 
     for pattern in patterns:
@@ -89,34 +87,36 @@ def _js_functions(content: str, file_path: str) -> list[dict]:
             lines = end_line - start_line + 1
             if lines > threshold:
                 findings.append(
-                    {
-                        "type": "large_function",
-                        "severity": "medium",
-                        "function": name,
-                        "file": file_path,
-                        "lines": lines,
-                        "description": f"Function '{name}' is {lines} lines (threshold: {threshold})",
-                    }
+                    create_finding(
+                        type="large_function",
+                        severity="medium",
+                        category="maintainability",
+                        file=file_path,
+                        line=start_line,
+                        message=f"Function '{name}' is {lines} lines (threshold: {threshold})",
+                        evidence={"function": name, "lines": lines, "threshold": threshold},
+                    )
                 )
 
     return findings
 
 
-def detect_large_functions(root: Path, files: list[Path]) -> list[dict]:
+def detect_large_functions(ctx: AnalysisContext) -> list[dict]:
     findings: list[dict] = []
+    threshold = settings.large_function_threshold
 
-    for file_path in files:
+    for file_path in ctx.files:
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
 
-        rel = relative_path(root, file_path)
+        rel = ctx.rel_path(file_path)
         ext = file_path.suffix.lower()
 
         if ext == ".py":
-            findings.extend(_python_functions(content, rel))
+            findings.extend(_python_functions(content, rel, threshold))
         elif ext in {".js", ".jsx", ".ts", ".tsx"}:
-            findings.extend(_js_functions(content, rel))
+            findings.extend(_js_functions(content, rel, threshold))
 
     return findings

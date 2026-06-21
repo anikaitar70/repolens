@@ -536,6 +536,117 @@ console.log(processOrders(sample));
     )
 
 
+def create_dead_code_sample(base: Path) -> None:
+    write(
+        base / "utils.py",
+        '''import json
+import numpy
+import os
+
+temp = 123
+active = True
+
+def format_date():
+    return "2026-01-01"
+
+def main():
+    print(json.dumps({"active": active}))
+
+if __name__ == "__main__":
+    main()
+''',
+    )
+    write(
+        base / "app.ts",
+        '''import axios from "axios";
+import fs from "fs";
+
+const temp = 456;
+const enabled = true;
+
+function helperFunction() {
+  return "unused";
+}
+
+export function main() {
+  console.log(enabled);
+}
+''',
+    )
+    write(
+        base / "worker.js",
+        '''const unusedValue = 789;
+const status = "ready";
+
+function cleanupStaleEntries() {
+  return status;
+}
+
+function main() {
+  console.log(status);
+}
+
+module.exports = { main };
+''',
+    )
+    write(
+        base / "data" / "large_data.py",
+        "\n".join([f"# padding line {index} for large file detection test" for index in range(1, 521)]),
+    )
+    write(
+        base / "services" / "orders.py",
+        '''def process_orders(orders):
+    result = []
+    for order in orders:
+        if order.get("status") == "pending":
+            if order.get("priority") == "high":
+                if order.get("amount", 0) > 100:
+                    if order.get("customer", {}).get("verified"):
+                        if order.get("items"):
+                            if all(item.get("in_stock") for item in order["items"]):
+                                if order.get("shipping", {}).get("country") in {"US", "CA", "UK"}:
+                                    if not order.get("fraud_flag"):
+                                        if order.get("payment", {}).get("method") != "cash":
+                                            result.append(order)
+                                        else:
+                                            result.append({"error": "cash blocked"})
+                                    else:
+                                        result.append({"error": "fraud"})
+                                else:
+                                    result.append({"error": "region"})
+                            else:
+                                result.append({"error": "stock"})
+                        else:
+                            result.append({"error": "items"})
+                    else:
+                        result.append({"error": "customer"})
+                else:
+                    result.append({"error": "amount"})
+            elif order.get("priority") == "medium":
+                result.append({"status": "queued"})
+            elif order.get("priority") == "low":
+                result.append({"status": "backlog"})
+            elif order.get("priority") == "rush":
+                result.append({"status": "rush-queue"})
+            elif order.get("priority") == "standard":
+                result.append({"status": "standard-queue"})
+            elif order.get("priority") == "bulk":
+                result.append({"status": "bulk-queue"})
+            else:
+                result.append({"status": "low-priority"})
+        elif order.get("status") == "review":
+            result.append({"status": "needs-review"})
+        elif order.get("status") == "cancelled":
+            result.append({"status": "cancelled"})
+        elif order.get("status") == "shipped":
+            result.append({"status": "complete"})
+        else:
+            result.append({"status": "unknown"})
+    return result
+''',
+    )
+
+
 def zip_directory(source: Path, destination: Path) -> None:
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
         for file_path in sorted(source.rglob("*")):
@@ -548,6 +659,7 @@ def main() -> None:
         "python-sample": create_python_sample,
         "js-sample": create_js_sample,
         "typescript-sample": create_typescript_sample,
+        "dead-code-sample": create_dead_code_sample,
     }
 
     SAMPLES.mkdir(parents=True, exist_ok=True)

@@ -3,6 +3,9 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+from app.analysis_context import AnalysisContext
+from app.findings import create_finding
+
 JS_IMPORT_PATTERN = re.compile(
     r"""import\s+(?:[\w\s{},*]+\s+from\s+)?['"]([^'"]+)['"]"""
 )
@@ -165,21 +168,25 @@ def _module_to_display_path(module: str, is_python: bool) -> str:
     return f"{module}.ts"
 
 
-def detect_circular_imports(root: Path, files: list[Path]) -> list[dict]:
+def detect_circular_imports(ctx: AnalysisContext) -> list[dict]:
     findings: list[dict] = []
+    root = ctx.root
+    files = ctx.files
 
     for graph, is_python in ((_build_python_graph(root, files), True), (_build_js_graph(root, files), False)):
         for cycle in _find_cycles(graph):
             chain = [_module_to_display_path(m, is_python) for m in cycle]
             chain_str = " -> ".join(cycle[:-1] + [cycle[0]])
             findings.append(
-                {
-                    "type": "architecture",
-                    "severity": "high",
-                    "issue": "Circular Dependency",
-                    "chain": chain,
-                    "description": f"Circular dependency detected: {chain_str}",
-                }
+                create_finding(
+                    type="circular_dependency",
+                    severity="high",
+                    category="architecture",
+                    file=chain[0] if chain else "",
+                    line=0,
+                    message=f"Circular dependency detected: {chain_str}",
+                    evidence={"issue": "Circular Dependency", "chain": chain},
+                )
             )
 
     return findings

@@ -49,5 +49,10 @@ def test_analyze_valid_python_repo():
     assert data["repository_name"] == "project"
     assert data["metrics"]["files_scanned"] == 1
     assert data["scores"]["security"] < 100
+    assert "dead_code" in data["scores"]
+    assert "findings_by_category" in data["metrics"]
+    assert "dead_code_summary" in data["metrics"]
     assert len(data["findings"]) >= 1
+    assert "id" in data["findings"][0]
+    assert "category" in data["findings"][0]
     assert data["ai_report"]

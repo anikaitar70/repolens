@@ -4,15 +4,18 @@ AI-assisted repository audit platform. Deterministic analyzers discover issues; 
 
 **Philosophy:** Analysis first, AI second.
 
-## Features (Phase 1)
+## Features (Phase 1 + Phase 2)
 
 - ZIP file upload (Python, JavaScript, TypeScript)
+- Tree-sitter AST parsing with shared cache across analyzers
 - Large file detection (>500 lines)
 - Large function detection (>50 lines)
 - Cyclomatic complexity analysis (Python, via Radon)
 - Security pattern detection
 - Circular import detection
-- Category scoring (Maintainability, Security, Architecture)
+- **Dead code detection:** unused imports, variables, and functions
+- Standardized finding schema with categories and evidence
+- Category scoring (Maintainability, Security, Architecture, Dead Code)
 - AI-generated audit report (Gemini)
 
 ## Tech Stack
@@ -235,6 +238,17 @@ pytest tests/ -v
 - `test_safe_extract_*` — zip-slip blocked, valid archives extracted
 - `test_health_endpoint` — returns `{"status":"ok"}`
 - `test_analyze_valid_python_repo` — returns findings and scores for a sample ZIP
+- `test_dead_code.py` — unused import/variable/function detection
+- `test_unused_*` — AST-based dead code analyzers
+
+### Phase 2 manual test (dead code sample)
+
+```powershell
+.\scripts\start-backend.ps1
+curl -X POST -F "file=@samples/dead-code-sample.zip" http://127.0.0.1:8080/api/analyze
+```
+
+**Expected:** ~14 findings including 4 unused imports, 4 unused variables, 4 unused functions, plus large file and complexity. Response includes `scores.dead_code`, `metrics.dead_code_summary`, and `metrics.findings_by_category`.
 
 ### Manual API test
 

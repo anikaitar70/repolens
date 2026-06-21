@@ -1,7 +1,7 @@
 import re
-from pathlib import Path
 
-from app.scanner import relative_path
+from app.analysis_context import AnalysisContext
+from app.findings import create_finding
 
 SECURITY_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("Dangerous eval() usage", re.compile(r"\beval\s*\("), "high"),
@@ -9,9 +9,7 @@ SECURITY_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("Unsafe innerHTML assignment", re.compile(r"\.innerHTML\s*="), "high"),
     (
         "Hardcoded Password",
-        re.compile(
-            r"""(?i)(?:password|passwd|pwd)\s*[=:]\s*['"][^'"]{3,}['"]"""
-        ),
+        re.compile(r"""(?i)(?:password|passwd|pwd)\s*[=:]\s*['"][^'"]{3,}['"]"""),
         "high",
     ),
     (
@@ -31,16 +29,16 @@ SECURITY_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
 ]
 
 
-def detect_security_issues(root: Path, files: list[Path]) -> list[dict]:
+def detect_security_issues(ctx: AnalysisContext) -> list[dict]:
     findings: list[dict] = []
 
-    for file_path in files:
+    for file_path in ctx.files:
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
 
-        rel = relative_path(root, file_path)
+        rel = ctx.rel_path(file_path)
         lines = content.splitlines()
 
         for issue_name, pattern, severity in SECURITY_PATTERNS:
@@ -51,14 +49,15 @@ def detect_security_issues(root: Path, files: list[Path]) -> list[dict]:
                         continue
 
                     findings.append(
-                        {
-                            "type": "security",
-                            "severity": severity,
-                            "file": rel,
-                            "line": line_num,
-                            "issue": issue_name,
-                            "description": f"{issue_name} detected at line {line_num}",
-                        }
+                        create_finding(
+                            type="security",
+                            severity=severity,
+                            category="security",
+                            file=rel,
+                            line=line_num,
+                            message=f"{issue_name} detected at line {line_num}",
+                            evidence={"issue": issue_name},
+                        )
                     )
 
     return findings
