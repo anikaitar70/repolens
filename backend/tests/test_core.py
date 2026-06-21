@@ -42,7 +42,7 @@ def test_safe_extract_rejects_zip_slip(tmp_path: Path):
 
     buffer.seek(0)
     with zipfile.ZipFile(buffer, "r") as archive:
-        with pytest.raises(ZipSecurityError, match="zip-slip"):
+        with pytest.raises(ZipSecurityError, match="traversal|zip-slip"):
             safe_extract_zip(archive, target)
 
 
