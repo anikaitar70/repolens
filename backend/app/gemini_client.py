@@ -28,6 +28,34 @@ Rules:
 - Be concise but actionable.
 """
 
+_GEMINI_FINDING_FIELDS = ("id", "type", "severity", "category", "file", "line", "message", "confidence")
+
+
+def _trim_finding(finding: dict) -> dict:
+    return {key: finding[key] for key in _GEMINI_FINDING_FIELDS if key in finding}
+
+
+def _build_gemini_payload(
+    metrics: dict,
+    scores: dict,
+    top_findings: list[dict],
+    findings_count: int,
+) -> dict:
+    return {
+        "metrics": {
+            "files_scanned": metrics.get("files_scanned"),
+            "total_lines": metrics.get("total_lines"),
+            "python_files": metrics.get("python_files"),
+            "javascript_files": metrics.get("javascript_files"),
+            "typescript_files": metrics.get("typescript_files"),
+            "findings_count": findings_count,
+            "findings_by_category": metrics.get("findings_by_category", {}),
+            "dead_code_summary": metrics.get("dead_code_summary", {}),
+        },
+        "scores": scores,
+        "top_findings": [_trim_finding(f) for f in top_findings[: settings.gemini_top_findings_limit]],
+    }
+
 
 def generate_report(
     metrics: dict,
@@ -35,18 +63,21 @@ def generate_report(
     findings: list[dict],
     top: list[dict] | None = None,
 ) -> str:
+    trimmed_top = (top or [])[: settings.gemini_top_findings_limit]
+
     if not settings.gemini_api_key:
         logger.info("Gemini API key not configured; using fallback report")
-        return _fallback_report(metrics, scores, findings, top or [])
+        return _fallback_report(metrics, scores, findings, trimmed_top)
 
-    payload = {
-        "metrics": metrics,
-        "scores": scores,
-        "findings_by_category": metrics.get("findings_by_category", build_findings_by_category(findings)),
-        "dead_code_summary": metrics.get("dead_code_summary", {}),
-        "top_findings": top or [],
-        "findings_count": len(findings),
-    }
+    payload = _build_gemini_payload(metrics, scores, trimmed_top, len(findings))
+    payload_bytes = len(json.dumps(payload))
+
+    logger.info(
+        "Gemini payload prepared: %d bytes, %d top findings (total findings: %d)",
+        payload_bytes,
+        len(payload["top_findings"]),
+        len(findings),
+    )
 
     try:
         genai.configure(api_key=settings.gemini_api_key)
@@ -63,11 +94,11 @@ def generate_report(
 
         response = model.generate_content(prompt)
         logger.info("Gemini report generated successfully")
-        return response.text or _fallback_report(metrics, scores, findings, top or [])
+        return response.text or _fallback_report(metrics, scores, findings, trimmed_top)
     except Exception:
         logger.exception("Gemini report generation failed")
         return (
-            _fallback_report(metrics, scores, findings, top or [])
+            _fallback_report(metrics, scores, findings, trimmed_top)
             + "\n\n---\n\n*Note: AI report generation failed. "
             "Showing automated summary instead.*"
         )
