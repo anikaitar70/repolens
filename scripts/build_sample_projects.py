@@ -647,6 +647,87 @@ module.exports = { main };
     )
 
 
+def create_duplicate_sample(base: Path) -> None:
+    write(
+        base / "orders.py",
+        '''
+def process_order(order):
+    if order.get("status") != "pending":
+        return 0
+    amount = order.get("amount", 0)
+    tax = order.get("tax", 0)
+    total = amount + tax
+    if total > 100:
+        return total * 0.9
+    return total
+''',
+    )
+    write(
+        base / "handlers.py",
+        '''
+def handle_order(item):
+    if item.get("status") != "pending":
+        return 0
+    price = item.get("amount", 0)
+    vat = item.get("tax", 0)
+    sum_value = price + vat
+    if sum_value > 100:
+        return sum_value * 0.9
+    return sum_value
+''',
+    )
+    write(
+        base / "pricing.py",
+        '''
+def calculate_price(base, discount):
+    if base <= 0:
+        return 0
+    value = base - discount
+    if value < 0:
+        return 0
+    return value * 1.08
+''',
+    )
+    write(
+        base / "billing.py",
+        '''
+def compute_cost(amount, reduction):
+    if amount <= 0:
+        return 0
+    result = amount - reduction
+    if result < 0:
+        return 0
+    return result * 1.08
+''',
+    )
+    write(
+        base / "validators" / "user_validator.py",
+        '''
+def validate_user_input(payload):
+    if not payload.get("email"):
+        return False
+    if "@" not in payload.get("email", ""):
+        return False
+    if len(payload.get("password", "")) < 8:
+        return False
+    return True
+''',
+    )
+    write(
+        base / "validators" / "admin_validator.py",
+        '''
+def validate_admin_input(data):
+    if not data.get("email"):
+        return False
+    if "@" not in data.get("email", ""):
+        return False
+    if len(data.get("password", "")) < 8:
+        return False
+    return True
+''',
+    )
+
+
 def zip_directory(source: Path, destination: Path) -> None:
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
         for file_path in sorted(source.rglob("*")):
@@ -660,6 +741,7 @@ def main() -> None:
         "js-sample": create_js_sample,
         "typescript-sample": create_typescript_sample,
         "dead-code-sample": create_dead_code_sample,
+        "duplicate-sample": create_duplicate_sample,
     }
 
     SAMPLES.mkdir(parents=True, exist_ok=True)
