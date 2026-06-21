@@ -8,6 +8,8 @@ venv/
 node_modules/
 .next/
 .env.local
+!.env.local.example
+!.env.example
 
 # OS
 .DS_Store
