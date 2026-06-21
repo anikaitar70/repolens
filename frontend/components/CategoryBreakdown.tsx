@@ -22,9 +22,9 @@ export default function CategoryBreakdown({ metrics }: CategoryBreakdownProps) {
     <div className="rounded-xl border border-slate-200 bg-white p-6">
       <h3 className="text-lg font-semibold text-slate-900">Findings by Category</h3>
       <p className="mt-1 text-sm text-slate-500">
-        Dead code: {metrics.dead_code_summary.unused_imports} imports,{" "}
-        {metrics.dead_code_summary.unused_variables} variables,{" "}
-        {metrics.dead_code_summary.unused_functions} functions
+        Dead code: {metrics.dead_code_summary?.unused_imports ?? 0} imports,{" "}
+        {metrics.dead_code_summary?.unused_variables ?? 0} variables,{" "}
+        {metrics.dead_code_summary?.unused_functions ?? 0} functions
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {categories.map(([category, count]) => (

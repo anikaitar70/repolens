@@ -25,20 +25,22 @@ function severityBadge(severity: string) {
   );
 }
 
-function categoryBadge(category: string) {
+function categoryBadge(category?: string) {
+  const value = category ?? "unknown";
   const styles: Record<string, string> = {
     maintainability: "bg-blue-100 text-blue-700",
     security: "bg-red-100 text-red-700",
     architecture: "bg-purple-100 text-purple-700",
     dead_code: "bg-slate-200 text-slate-700",
+    unknown: "bg-slate-100 text-slate-700",
   };
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        styles[category] || "bg-slate-100 text-slate-700"
+        styles[value] || styles.unknown
       }`}
     >
-      {category.replace("_", " ")}
+      {value.replace(/_/g, " ")}
     </span>
   );
 }
@@ -99,8 +101,8 @@ export default function FindingsTable({ findings }: FindingsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((finding) => (
-              <tr key={finding.id} className="hover:bg-slate-50">
+            {filtered.map((finding, index) => (
+              <tr key={finding.id ?? `${finding.type}-${index}`} className="hover:bg-slate-50">
                 <td className="px-6 py-4">{severityBadge(finding.severity)}</td>
                 <td className="px-6 py-4">{categoryBadge(finding.category)}</td>
                 <td className="px-6 py-4 font-mono text-xs text-slate-700">

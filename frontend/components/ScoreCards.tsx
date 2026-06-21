@@ -49,7 +49,7 @@ export default function ScoreCards({ metrics, scores, repositoryName }: ScoreCar
         <ScoreRing label="Maintainability" score={scores.maintainability} />
         <ScoreRing label="Security" score={scores.security} />
         <ScoreRing label="Architecture" score={scores.architecture} />
-        <ScoreRing label="Dead Code" score={scores.dead_code} />
+        <ScoreRing label="Dead Code" score={scores.dead_code ?? 100} />
       </div>
     </div>
   );
