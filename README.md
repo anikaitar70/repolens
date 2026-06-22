@@ -1,6 +1,6 @@
 # RepoLens
 
-AI-assisted repository audit platform. Deterministic analyzers discover issues; Gemini converts structured findings into a professional audit report.
+AI-assisted repository audit platform. Deterministic analyzers discover issues; Groq converts structured findings into a professional audit report.
 
 **Philosophy:** Analysis first, AI second.
 
@@ -15,8 +15,9 @@ AI-assisted repository audit platform. Deterministic analyzers discover issues; 
 - Circular import detection
 - **Dead code detection:** unused imports, variables, and functions
 - Standardized finding schema with categories and evidence
+- **Semantic duplicate detection** (local embeddings, cosine similarity)
 - Category scoring (Maintainability, Security, Architecture, Dead Code)
-- AI-generated audit report (Gemini)
+- AI-generated audit report (Groq — `llama-3.3-70b-versatile` by default)
 
 ## Tech Stack
 
@@ -24,7 +25,7 @@ AI-assisted repository audit platform. Deterministic analyzers discover issues; 
 |----------|-------------------------|
 | Frontend | Next.js 16, TypeScript, Tailwind CSS |
 | Backend  | FastAPI, Python 3.12    |
-| AI       | Google Gemini API       |
+| AI       | Groq API (pluggable provider architecture) |
 
 ## Project Structure
 
@@ -34,10 +35,11 @@ repolens/
 │   ├── app/
 │   │   ├── analyzers/       # Static analysis modules
 │   │   ├── main.py          # FastAPI application
+│   │   ├── services/        # Embeddings, report generation
+│   │   ├── providers/       # AI provider abstraction (Groq, Gemini)
 │   │   ├── pipeline.py      # Analysis orchestration
 │   │   ├── scanner.py       # Repository traversal
-│   │   ├── scoring.py       # Score calculation
-│   │   └── gemini_client.py # Report generation
+│   │   └── scoring.py       # Score calculation
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -56,7 +58,7 @@ repolens/
 - Python 3.12+
 - Node.js 20+
 - npm
-- (Optional) Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+- (Optional) Groq API key from [Groq Console](https://console.groq.com/keys)
 
 ### Backend
 
@@ -83,7 +85,7 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env and set GEMINI_API_KEY (optional — fallback report works without it)
+# Edit .env and set GROQ_API_KEY (optional — fallback report works without it)
 
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8080
 ```
@@ -112,19 +114,25 @@ App: http://localhost:3000
 
 ### Environment Variables
 
-**Backend (`backend/.env`)**
+**Backend (`backend/.env` or project root `.env`)**
 
-| Variable              | Description                          | Default |
-|-----------------------|--------------------------------------|---------|
-| `GEMINI_API_KEY`      | Google Gemini API key                | —       |
-| `GEMINI_MODEL`        | Gemini model name                    | `gemini-2.0-flash` |
-| `MAX_UPLOAD_SIZE`     | Max upload size in bytes             | `52428800` (50 MB) |
-| `MAX_EXTRACTED_SIZE`  | Max extracted archive size in bytes  | `209715200` (200 MB) |
-| `MAX_EXTRACTED_FILES` | Max files allowed in archive         | `10000` |
-| `UPLOAD_DIRECTORY`    | Temp directory for uploads           | `/tmp/repolens/uploads` |
-| `LOG_LEVEL`           | Logging level                        | `INFO` |
-| `CORS_ORIGINS`        | Comma-separated allowed origins      | `http://localhost:3000` |
-| `DEBUG`               | Expose internal errors when true     | `false` |
+| Variable                   | Description                              | Default |
+|----------------------------|------------------------------------------|---------|
+| `GROQ_API_KEY`             | Groq API key                             | —       |
+| `GROQ_MODEL`               | Groq model for report generation         | `llama-3.3-70b-versatile` |
+| `REPORT_PROVIDER`          | AI provider (`groq` or `gemini`)         | `groq`  |
+| `REPORT_TOP_FINDINGS_LIMIT`| Max findings sent to AI provider         | `15`    |
+| `REPORT_MAX_PAYLOAD_BYTES` | Max JSON payload size for AI requests    | `12000` |
+| `REPORT_TIMEOUT_SECONDS`   | AI request timeout in seconds            | `60`    |
+| `MAX_UPLOAD_SIZE`          | Max upload size in bytes                 | `26214400` (25 MB) |
+| `MAX_EXTRACTED_SIZE`       | Max extracted archive size in bytes      | `104857600` (100 MB) |
+| `MAX_EXTRACTED_FILES`      | Max files allowed in archive               | `5000` |
+| `UPLOAD_DIRECTORY`         | Temp directory for uploads               | `/tmp/repolens/uploads` |
+| `LOG_LEVEL`                | Logging level                            | `INFO` |
+| `CORS_ORIGINS`             | Comma-separated allowed origins          | `http://localhost:3000` |
+| `DEBUG`                    | Expose internal errors when true           | `false` |
+
+**Legacy Gemini (optional):** set `REPORT_PROVIDER=gemini` and `GEMINI_API_KEY`.
 
 **Frontend (`frontend/.env.local`)**
 
@@ -168,8 +176,8 @@ curl -X POST -F "file=@samples/python-sample.zip" http://127.0.0.1:8080/api/anal
 ## Docker
 
 ```bash
-# Optional: set Gemini API key
-export GEMINI_API_KEY=your_key_here
+# Optional: set Groq API key in .env
+export GROQ_API_KEY=your_key_here
 
 docker compose up --build
 ```
@@ -238,8 +246,27 @@ pytest tests/ -v
 - `test_safe_extract_*` — zip-slip blocked, valid archives extracted
 - `test_health_endpoint` — returns `{"status":"ok"}`
 - `test_analyze_valid_python_repo` — returns findings and scores for a sample ZIP
-- `test_dead_code.py` — unused import/variable/function detection
-- `test_unused_*` — AST-based dead code analyzers
+- `test_report_service.py` — Groq provider, payload limits, error handling
+- `test_duplicate_logic.py` — semantic duplicate detection
+
+### Groq setup and troubleshooting
+
+1. Create a free API key at [console.groq.com/keys](https://console.groq.com/keys).
+2. Add to project root `.env`:
+   ```
+   GROQ_API_KEY=gsk_...
+   GROQ_MODEL=llama-3.3-70b-versatile
+   ```
+3. Restart the backend.
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `AI report unavailable.` in report | Missing/invalid key, rate limit, or timeout | Check `GROQ_API_KEY`, wait and retry, or increase `REPORT_TIMEOUT_SECONDS` |
+| Automated summary only | No `GROQ_API_KEY` configured | Expected — analysis still works; add key for AI report |
+| 429 rate limit | Groq free-tier quota exceeded | Wait for reset or upgrade plan |
+| Slow first duplicate analysis | Embedding model download | One-time ~90 MB download; subsequent runs are faster |
+
+**Payload limits:** Only scores, metrics, summaries, and top findings (default 15, max payload 12 KB) are sent to Groq. Source code is never transmitted.
 
 ### Phase 2 manual test (dead code sample)
 
