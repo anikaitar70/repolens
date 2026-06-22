@@ -9,6 +9,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    report_provider: str = "groq"
+
+    # Legacy Gemini support (optional)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
@@ -25,7 +30,15 @@ class Settings(BaseSettings):
         default=10_485_760, description="Max single extracted file size in bytes (10 MB)"
     )
     max_analysis_seconds: int = Field(default=120, description="Max analysis runtime in seconds")
-    gemini_top_findings_limit: int = Field(default=15, description="Max findings sent to Gemini")
+    report_top_findings_limit: int = Field(
+        default=15, description="Max findings sent to the AI report provider"
+    )
+    report_max_payload_bytes: int = Field(
+        default=12_000, description="Max JSON payload size sent to the AI report provider"
+    )
+    report_timeout_seconds: float = Field(
+        default=60.0, description="Timeout in seconds for AI report generation requests"
+    )
 
     duplicate_detection_enabled: bool = True
     duplicate_min_lines: int = 5

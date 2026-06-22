@@ -14,7 +14,7 @@ from app.analyzers.security import detect_security_issues
 from app.config import settings
 from app.exceptions import AnalysisError, InvalidUploadError, RepoLensError
 from app.extract import safe_extract_zip
-from app.gemini_client import generate_report
+from app.services.report_service import generate_report
 from app.logging_config import get_logger
 from app.models import (
     AnalysisResponse,

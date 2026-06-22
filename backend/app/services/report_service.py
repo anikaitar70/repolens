@@ -1,9 +1,24 @@
-import json
+"""
+Report generation service.
 
-import google.generativeai as genai
+Architecture:
+  Report Service -> AI Provider Interface -> Groq / Gemini providers
+
+Payload limits (documented in README):
+  - REPORT_TOP_FINDINGS_LIMIT: max findings sent to the AI provider (default 15)
+  - REPORT_MAX_PAYLOAD_BYTES: hard cap on JSON payload size (default 12_000)
+  - Top duplicate findings capped at 5
+  - Only structured fields are sent — never source code or raw files
+"""
+
+from __future__ import annotations
+
+import json
 
 from app.config import settings
 from app.logging_config import get_logger
+from app.providers.base import ReportProviderError
+from app.providers.factory import get_report_provider
 from app.summary import build_findings_by_category
 
 logger = get_logger(__name__)
@@ -29,14 +44,27 @@ Rules:
 - Be concise but actionable.
 """
 
-_GEMINI_FINDING_FIELDS = (
-    "id", "type", "severity", "category", "file", "line", "message", "confidence",
-    "file_a", "function_a", "file_b", "function_b", "similarity",
+_REPORT_FINDING_FIELDS = (
+    "id",
+    "type",
+    "severity",
+    "category",
+    "file",
+    "line",
+    "message",
+    "confidence",
+    "file_a",
+    "function_a",
+    "file_b",
+    "function_b",
+    "similarity",
 )
+
+AI_UNAVAILABLE_HEADER = "# AI report unavailable.\n"
 
 
 def _trim_finding(finding: dict) -> dict:
-    trimmed = {key: finding[key] for key in _GEMINI_FINDING_FIELDS if key in finding}
+    trimmed = {key: finding[key] for key in _REPORT_FINDING_FIELDS if key in finding}
     if finding.get("type") == "duplicate_logic" and "evidence" in finding:
         evidence = finding["evidence"]
         for key in ("file_a", "function_a", "file_b", "function_b", "similarity"):
@@ -45,11 +73,13 @@ def _trim_finding(finding: dict) -> dict:
     return trimmed
 
 
-def _build_gemini_payload(
+def _build_report_payload(
     metrics: dict,
     scores: dict,
     top_findings: list[dict],
     findings_count: int,
+    *,
+    findings_limit: int,
 ) -> dict:
     return {
         "metrics": {
@@ -64,7 +94,7 @@ def _build_gemini_payload(
             "duplicate_logic_summary": metrics.get("duplicate_logic_summary", {}),
         },
         "scores": scores,
-        "top_findings": [_trim_finding(f) for f in top_findings[: settings.gemini_top_findings_limit]],
+        "top_findings": [_trim_finding(f) for f in top_findings[:findings_limit]],
         "top_duplicate_findings": [
             _trim_finding(f)
             for f in top_findings
@@ -73,51 +103,99 @@ def _build_gemini_payload(
     }
 
 
+def _payload_size(payload: dict) -> int:
+    return len(json.dumps(payload, separators=(",", ":")))
+
+
+def _build_size_limited_payload(
+    metrics: dict,
+    scores: dict,
+    top_findings: list[dict],
+    findings_count: int,
+) -> tuple[dict, int]:
+    """
+    Build a payload within REPORT_MAX_PAYLOAD_BYTES by reducing top findings count.
+    """
+    limit = settings.report_top_findings_limit
+    while limit >= 1:
+        payload = _build_report_payload(
+            metrics,
+            scores,
+            top_findings,
+            findings_count,
+            findings_limit=limit,
+        )
+        size = _payload_size(payload)
+        if size <= settings.report_max_payload_bytes:
+            return payload, size
+        limit -= 1
+
+    payload = _build_report_payload(
+        metrics,
+        scores,
+        [],
+        findings_count,
+        findings_limit=0,
+    )
+    return payload, _payload_size(payload)
+
+
 def generate_report(
     metrics: dict,
     scores: dict,
     findings: list[dict],
     top: list[dict] | None = None,
 ) -> str:
-    trimmed_top = (top or [])[: settings.gemini_top_findings_limit]
+    trimmed_top = (top or [])[: settings.report_top_findings_limit]
+    provider = get_report_provider()
 
-    if not settings.gemini_api_key:
-        logger.info("Gemini API key not configured; using fallback report")
+    if provider is None:
+        logger.info("No AI report provider configured; using fallback report")
         return _fallback_report(metrics, scores, findings, trimmed_top)
 
-    payload = _build_gemini_payload(metrics, scores, trimmed_top, len(findings))
-    payload_bytes = len(json.dumps(payload))
+    payload, payload_bytes = _build_size_limited_payload(
+        metrics,
+        scores,
+        trimmed_top,
+        len(findings),
+    )
 
     logger.info(
-        "Gemini payload prepared: %d bytes, %d top findings (total findings: %d)",
+        "%s payload prepared: %d bytes (limit %d), %d top findings (total findings: %d)",
+        provider.name.title(),
         payload_bytes,
+        settings.report_max_payload_bytes,
         len(payload["top_findings"]),
         len(findings),
     )
 
+    user_prompt = (
+        "Generate a professional software audit report based on the following "
+        "structured analysis results:\n\n"
+        f"```json\n{json.dumps(payload, indent=2)}\n```"
+    )
+
     try:
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(
-            model_name=settings.gemini_model,
-            system_instruction=SYSTEM_PROMPT,
-        )
-
-        prompt = (
-            "Generate a professional software audit report based on the following "
-            "structured analysis results:\n\n"
-            f"```json\n{json.dumps(payload, indent=2)}\n```"
-        )
-
-        response = model.generate_content(prompt)
-        logger.info("Gemini report generated successfully")
-        return response.text or _fallback_report(metrics, scores, findings, trimmed_top)
+        return provider.generate(SYSTEM_PROMPT, user_prompt)
+    except ReportProviderError as exc:
+        logger.warning("%s report generation failed: %s", provider.name.title(), exc)
+        return _unavailable_report(metrics, scores, findings, trimmed_top)
     except Exception:
-        logger.exception("Gemini report generation failed")
-        return (
-            _fallback_report(metrics, scores, findings, trimmed_top)
-            + "\n\n---\n\n*Note: AI report generation failed. "
-            "Showing automated summary instead.*"
-        )
+        logger.exception("%s report generation failed unexpectedly", provider.name.title())
+        return _unavailable_report(metrics, scores, findings, trimmed_top)
+
+
+def _unavailable_report(
+    metrics: dict,
+    scores: dict,
+    findings: list[dict],
+    top: list[dict],
+) -> str:
+    return (
+        AI_UNAVAILABLE_HEADER
+        + "\n---\n\n"
+        + _fallback_report(metrics, scores, findings, top)
+    )
 
 
 def _category_findings(findings: list[dict], category: str, limit: int = 8) -> list[dict]:
@@ -169,7 +247,9 @@ def _fallback_report(
         lines.append("No security issues detected.")
 
     lines.extend(["", "## Maintainability Assessment", ""])
-    maintainability = [f for f in findings if f.get("category") == "maintainability" and f.get("type") != "duplicate_logic"]
+    maintainability = [
+        f for f in findings if f.get("category") == "maintainability" and f.get("type") != "duplicate_logic"
+    ]
     if maintainability:
         for item in maintainability[:8]:
             lines.append(f"- {item.get('message')}")
@@ -218,5 +298,5 @@ def _fallback_report(
         lines.append("No immediate actions required.")
 
     lines.append("")
-    lines.append("*Report generated without AI (GEMINI_API_KEY not configured).*")
+    lines.append("*Automated summary generated without AI.*")
     return "\n".join(lines)
