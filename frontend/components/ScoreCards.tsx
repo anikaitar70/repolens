@@ -34,7 +34,7 @@ export default function ScoreCards({ metrics, scores, repositoryName }: ScoreCar
         <p className="text-sm text-slate-500">Analysis complete</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <p className="text-sm font-medium text-slate-500">Files Scanned</p>
           <p className="mt-2 text-3xl font-bold text-slate-900">{metrics.files_scanned}</p>
@@ -49,6 +49,7 @@ export default function ScoreCards({ metrics, scores, repositoryName }: ScoreCar
         <ScoreRing label="Maintainability" score={scores.maintainability} />
         <ScoreRing label="Security" score={scores.security} />
         <ScoreRing label="Architecture" score={scores.architecture} />
+        <ScoreRing label="Arch. Risk" score={scores.architecture_risk ?? 100} />
         <ScoreRing label="Dead Code" score={scores.dead_code ?? 100} />
       </div>
     </div>

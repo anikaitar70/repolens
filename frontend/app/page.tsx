@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { analyzeRepository } from "@/lib/api";
+import { loadAiSettings, type AiSettings } from "@/lib/aiSettings";
 import type { AnalysisResult, AnalysisState } from "@/types/analysis";
+import AiSettingsPanel from "@/components/AiSettingsPanel";
 import AnalysisProgress from "@/components/AnalysisProgress";
+import ArchitectureDashboard from "@/components/ArchitectureDashboard";
+import AuditReport from "@/components/AuditReport";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
 import DuplicateLogicTable from "@/components/DuplicateLogicTable";
-import AuditReport from "@/components/AuditReport";
 import FindingsTable from "@/components/FindingsTable";
 import Hero from "@/components/Hero";
+import PromptExport from "@/components/PromptExport";
 import ScoreCards from "@/components/ScoreCards";
 import UploadArea from "@/components/UploadArea";
 
@@ -16,6 +20,11 @@ export default function HomePage() {
   const [state, setState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+
+  const handleSettingsChange = useCallback((settings: AiSettings) => {
+    setAiSettings(settings);
+  }, []);
 
   const handleUpload = async (file: File) => {
     setState("analyzing");
@@ -23,7 +32,7 @@ export default function HomePage() {
     setResult(null);
 
     try {
-      const data = await analyzeRepository(file);
+      const data = await analyzeRepository(file, aiSettings);
       setResult(data);
       setState("complete");
     } catch (err) {
@@ -58,6 +67,7 @@ export default function HomePage() {
         {state === "idle" && (
           <div className="space-y-10">
             <Hero />
+            <AiSettingsPanel onChange={handleSettingsChange} />
             <UploadArea onUpload={handleUpload} />
           </div>
         )}
@@ -90,13 +100,23 @@ export default function HomePage() {
               scores={result.scores}
               repositoryName={result.repository_name}
             />
+            <ArchitectureDashboard
+              findings={result.findings}
+              architectureSummary={result.metrics.architecture_summary}
+              dependencySummary={result.metrics.dependency_summary}
+              architectureRisk={result.scores.architecture_risk}
+            />
             <CategoryBreakdown metrics={result.metrics} />
             <DuplicateLogicTable
               findings={result.findings}
               summary={result.metrics.duplicate_logic_summary}
             />
             <FindingsTable findings={result.findings} />
-            <AuditReport report={result.ai_report} />
+            {result.ai_report ? (
+              <AuditReport report={result.ai_report} />
+            ) : result.prompt_export ? (
+              <PromptExport prompt={result.prompt_export} />
+            ) : null}
           </div>
         )}
       </div>

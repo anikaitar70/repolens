@@ -3,6 +3,7 @@ export interface Scores {
   security: number;
   architecture: number;
   dead_code: number;
+  architecture_risk: number;
 }
 
 export interface DeadCodeSummary {
@@ -18,6 +19,19 @@ export interface DuplicateLogicSummary {
   possible_duplicates: number;
 }
 
+export interface ArchitectureSummary {
+  god_files: number;
+  hotspots: number;
+  coupling_issues: number;
+  circular_dependencies: number;
+}
+
+export interface DependencySummary {
+  large_dependency_manifests: number;
+  missing_manifests: number;
+  concentration_issues: number;
+}
+
 export interface Metrics {
   files_scanned: number;
   total_lines: number;
@@ -28,6 +42,8 @@ export interface Metrics {
   findings_by_category: Record<string, number>;
   dead_code_summary: DeadCodeSummary;
   duplicate_logic_summary: DuplicateLogicSummary;
+  architecture_summary: ArchitectureSummary;
+  dependency_summary: DependencySummary;
 }
 
 export interface Finding {
@@ -62,6 +78,7 @@ export interface AnalysisResult {
   scores: Scores;
   findings: Finding[];
   ai_report: string;
+  prompt_export?: string | null;
 }
 
 export type AnalysisState = "idle" | "uploading" | "analyzing" | "complete" | "error";

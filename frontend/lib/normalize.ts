@@ -14,6 +14,12 @@ function inferCategory(type: string): Finding["category"] {
     case "security":
       return "security";
     case "circular_dependency":
+    case "god_file":
+    case "high_coupling":
+    case "architectural_hotspot":
+    case "missing_dependency_file":
+    case "large_dependency_count":
+    case "dependency_concentration":
     case "architecture":
       return "architecture";
     case "unused_import":
@@ -80,6 +86,7 @@ export function normalizeAnalysisResult(data: AnalysisResult): AnalysisResult {
     security: data.scores?.security ?? 100,
     architecture: data.scores?.architecture ?? 100,
     dead_code: data.scores?.dead_code ?? 100,
+    architecture_risk: data.scores?.architecture_risk ?? 100,
   };
 
   const metrics: Metrics = {
@@ -101,6 +108,17 @@ export function normalizeAnalysisResult(data: AnalysisResult): AnalysisResult {
       medium_confidence_duplicates: 0,
       possible_duplicates: 0,
     },
+    architecture_summary: data.metrics?.architecture_summary ?? {
+      god_files: 0,
+      hotspots: 0,
+      coupling_issues: 0,
+      circular_dependencies: 0,
+    },
+    dependency_summary: data.metrics?.dependency_summary ?? {
+      large_dependency_manifests: 0,
+      missing_manifests: 0,
+      concentration_issues: 0,
+    },
   };
 
   if (Object.keys(metrics.findings_by_category).length === 0 && findings.length > 0) {
@@ -115,5 +133,7 @@ export function normalizeAnalysisResult(data: AnalysisResult): AnalysisResult {
     findings,
     scores,
     metrics,
+    ai_report: data.ai_report ?? "",
+    prompt_export: data.prompt_export ?? null,
   };
 }
