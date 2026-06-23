@@ -37,6 +37,29 @@ def build_duplicate_logic_summary(findings: list[dict]) -> dict[str, int]:
     }
 
 
+def build_architecture_summary(findings: list[dict]) -> dict[str, int]:
+    return {
+        "god_files": sum(1 for f in findings if f.get("type") == "god_file"),
+        "hotspots": sum(1 for f in findings if f.get("type") == "architectural_hotspot"),
+        "coupling_issues": sum(1 for f in findings if f.get("type") == "high_coupling"),
+        "circular_dependencies": sum(1 for f in findings if f.get("type") == "circular_dependency"),
+    }
+
+
+def build_dependency_summary(findings: list[dict]) -> dict[str, int]:
+    return {
+        "large_dependency_manifests": sum(
+            1 for f in findings if f.get("type") == "large_dependency_count"
+        ),
+        "missing_manifests": sum(
+            1 for f in findings if f.get("type") == "missing_dependency_file"
+        ),
+        "concentration_issues": sum(
+            1 for f in findings if f.get("type") == "dependency_concentration"
+        ),
+    }
+
+
 def build_findings_by_category(findings: list[dict]) -> dict[str, int]:
     return dict(Counter(finding.get("category", "unknown") for finding in findings))
 

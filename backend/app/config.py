@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     duplicate_medium_threshold: float = 0.90
     duplicate_possible_threshold: float = 0.85
 
+    god_file_line_threshold: int = 1000
+    high_coupling_threshold: int = 10
+    hotspot_finding_threshold: int = 3
+    large_dependency_count_threshold: int = 50
+
     upload_directory: str = "/tmp/repolens/uploads"
 
     log_level: str = "INFO"

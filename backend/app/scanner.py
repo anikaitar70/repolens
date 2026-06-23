@@ -66,5 +66,16 @@ def compute_metrics(root: Path, files: list[Path]) -> dict:
     }
 
 
-def relative_path(root: Path, path: Path) -> str:
-    return str(path.relative_to(root)).replace("\\", "/")
+def scan_manifest_files(root: Path) -> dict[str, Path]:
+    """Find dependency manifest files, skipping ignored directories."""
+    manifests: dict[str, Path] = {}
+    target_names = {"package.json", "requirements.txt", "pyproject.toml"}
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if not should_ignore_dir(d)]
+        for filename in filenames:
+            if filename.lower() in target_names:
+                path = Path(dirpath) / filename
+                manifests[filename.lower()] = path
+
+    return manifests
