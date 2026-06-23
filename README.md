@@ -1,23 +1,27 @@
 # RepoLens
 
-AI-assisted repository audit platform. Deterministic analyzers discover issues; Groq converts structured findings into a professional audit report.
+AI-assisted repository architecture review platform. Deterministic analyzers discover issues; optional BYOK AI generates audit reports or exports an AI-ready prompt.
 
 **Philosophy:** Analysis first, AI second.
 
-## Features (Phase 1 + Phase 2)
+## Features
 
+### Core Analysis (Phases 1–3)
 - ZIP file upload (Python, JavaScript, TypeScript)
 - Tree-sitter AST parsing with shared cache across analyzers
-- Large file detection (>500 lines)
-- Large function detection (>50 lines)
-- Cyclomatic complexity analysis (Python, via Radon)
-- Security pattern detection
-- Circular import detection
-- **Dead code detection:** unused imports, variables, and functions
-- Standardized finding schema with categories and evidence
-- **Semantic duplicate detection** (local embeddings, cosine similarity)
+- Large file / function detection, complexity, security patterns
+- Circular import detection, dead code detection
+- Semantic duplicate detection (local embeddings)
 - Category scoring (Maintainability, Security, Architecture, Dead Code)
-- AI-generated audit report (Groq — `llama-3.3-70b-versatile` by default)
+
+### Phase 4 — Architecture Intelligence + BYOK AI
+- **Bring Your Own API Key (BYOK):** Groq, OpenAI, Gemini, Anthropic, OpenRouter
+- Keys stored in browser localStorage only — never persisted on server
+- **Prompt Export Mode:** copy-paste AI-ready prompt when no key configured
+- **Dependency Intelligence:** `package.json`, `requirements.txt`, `pyproject.toml`
+- **Architecture Intelligence:** god files, coupling, hotspots, circular deps
+- **Architecture Risk Score** (0–100) based on cycles, coupling, god files, hotspots
+- Architecture dashboard with summary cards
 
 ## Tech Stack
 
@@ -25,7 +29,7 @@ AI-assisted repository audit platform. Deterministic analyzers discover issues; 
 |----------|-------------------------|
 | Frontend | Next.js 16, TypeScript, Tailwind CSS |
 | Backend  | FastAPI, Python 3.12    |
-| AI       | Groq API (pluggable provider architecture) |
+| AI       | BYOK: Groq, OpenAI, Gemini, Anthropic, OpenRouter |
 
 ## Project Structure
 
@@ -58,7 +62,19 @@ repolens/
 - Python 3.12+
 - Node.js 20+
 - npm
-- (Optional) Groq API key from [Groq Console](https://console.groq.com/keys)
+- (Optional) API key from your preferred AI provider
+
+### AI Setup (BYOK)
+
+1. Open the **AI Settings** panel on the homepage.
+2. Select provider (Groq recommended: `llama-3.3-70b-versatile`).
+3. Paste your API key — stored in browser localStorage only.
+4. Click **Test Connection** to verify.
+5. Upload a ZIP — key is sent via request headers, never logged or stored server-side.
+
+**No API key?** Analysis still works. You receive an **AI-Ready Prompt** to copy into ChatGPT, Claude, Gemini, or Grok.
+
+**Server fallback (local dev):** set `GROQ_API_KEY` in `.env` if no BYOK key is sent.
 
 ### Backend
 
@@ -227,6 +243,21 @@ All categories start at 100 and deductions are applied per finding:
 | Complexity         | Maintainability  | -3        |
 | Security issue     | Security         | -10       |
 | Circular dependency| Architecture     | -5        |
+| God file (high)    | Architecture     | -5        |
+| Architectural hotspot | Architecture  | -5        |
+| High coupling      | Architecture     | -3        |
+| Large dependency count | Architecture | -2     |
+
+**Architecture Risk Score** (separate 0–100 metric):
+
+| Finding Type          | Risk Deduction |
+|-----------------------|----------------|
+| Circular dependency   | -10            |
+| God file (high/medium)  | -8 / -5        |
+| Architectural hotspot | -6             |
+| High coupling           | -4             |
+| Large dependency count  | -3             |
+| Missing manifest        | -2             |
 
 Scores are clamped between 0 and 100.
 

@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from app.providers.base import ReportProviderError
-from app.providers.factory import get_report_provider
+from app.providers.factory import AiConfig, get_report_provider
 from app.providers.groq_provider import GroqProvider
 from app.services.report_service import (
     _build_size_limited_payload,
@@ -29,6 +29,8 @@ def sample_metrics() -> dict:
             "medium_confidence_duplicates": 0,
             "possible_duplicates": 0,
         },
+        "architecture_summary": {},
+        "dependency_summary": {},
     }
 
 
@@ -39,6 +41,7 @@ def sample_scores() -> dict:
         "security": 80,
         "architecture": 95,
         "dead_code": 99,
+        "architecture_risk": 95,
     }
 
 
@@ -63,24 +66,23 @@ def test_get_report_provider_missing_key():
         mock_settings.groq_api_key = ""
         mock_settings.gemini_api_key = ""
         assert get_report_provider() is None
+        assert get_report_provider(AiConfig(provider="groq", api_key="")) is None
 
 
 def test_get_report_provider_groq():
-    with patch("app.providers.factory.settings") as mock_settings:
-        mock_settings.report_provider = "groq"
-        mock_settings.groq_api_key = "test-key"
-        mock_settings.gemini_api_key = ""
-        provider = get_report_provider()
-        assert provider is not None
-        assert provider.name == "groq"
+    provider = get_report_provider(
+        AiConfig(provider="groq", model="llama-3.3-70b-versatile", api_key="test-key")
+    )
+    assert provider is not None
+    assert provider.name == "groq"
 
 
 def test_generate_report_missing_api_key(sample_metrics, sample_scores, sample_findings):
     with patch("app.services.report_service.get_report_provider", return_value=None):
-        report = generate_report(sample_metrics, sample_scores, sample_findings)
-    assert "Repository Audit Report" in report
-    assert "Automated summary generated without AI" in report
-    assert "AI report unavailable" not in report
+        result = generate_report(sample_metrics, sample_scores, sample_findings)
+    assert result.ai_report == ""
+    assert result.prompt_export is not None
+    assert "Executive Summary" in result.prompt_export
 
 
 def test_generate_report_success(sample_metrics, sample_scores, sample_findings):
@@ -89,9 +91,10 @@ def test_generate_report_success(sample_metrics, sample_scores, sample_findings)
     provider.generate.return_value = "# AI Report\n\n## Executive Summary\nAll good."
 
     with patch("app.services.report_service.get_report_provider", return_value=provider):
-        report = generate_report(sample_metrics, sample_scores, sample_findings)
+        result = generate_report(sample_metrics, sample_scores, sample_findings)
 
-    assert report.startswith("# AI Report")
+    assert result.ai_report.startswith("# AI Report")
+    assert result.prompt_export is None
     provider.generate.assert_called_once()
 
 
@@ -101,10 +104,10 @@ def test_generate_report_rate_limit_fallback(sample_metrics, sample_scores, samp
     provider.generate.side_effect = ReportProviderError("Groq rate limit exceeded.", retryable=True)
 
     with patch("app.services.report_service.get_report_provider", return_value=provider):
-        report = generate_report(sample_metrics, sample_scores, sample_findings)
+        result = generate_report(sample_metrics, sample_scores, sample_findings)
 
-    assert report.startswith("# AI report unavailable.")
-    assert "Repository Audit Report" in report
+    assert "AI report unavailable" in result.ai_report
+    assert result.prompt_export is not None
 
 
 def test_generate_report_invalid_key_fallback(sample_metrics, sample_scores, sample_findings):
@@ -113,9 +116,9 @@ def test_generate_report_invalid_key_fallback(sample_metrics, sample_scores, sam
     provider.generate.side_effect = ReportProviderError("Groq API key is invalid.")
 
     with patch("app.services.report_service.get_report_provider", return_value=provider):
-        report = generate_report(sample_metrics, sample_scores, sample_findings)
+        result = generate_report(sample_metrics, sample_scores, sample_findings)
 
-    assert "AI report unavailable." in report
+    assert "AI report unavailable" in result.ai_report
 
 
 def test_generate_report_empty_findings(sample_metrics, sample_scores):
@@ -124,9 +127,9 @@ def test_generate_report_empty_findings(sample_metrics, sample_scores):
     provider.generate.return_value = "# Empty Repo\n\nNo issues."
 
     with patch("app.services.report_service.get_report_provider", return_value=provider):
-        report = generate_report(sample_metrics, sample_scores, [])
+        result = generate_report(sample_metrics, sample_scores, [])
 
-    assert report.startswith("# Empty Repo")
+    assert result.ai_report.startswith("# Empty Repo")
 
 
 def test_payload_size_limit_trims_findings(sample_metrics, sample_scores):
@@ -172,7 +175,7 @@ def test_groq_provider_success():
 
 
 def test_groq_provider_invalid_key():
-    provider = GroqProvider(api_key="bad-key", timeout_seconds=5.0)
+    provider = GroqProvider(api_key="bad-key", model="llama-3.3-70b-versatile", timeout_seconds=5.0)
     response = httpx.Response(
         401,
         json={"error": {"message": "invalid"}},
@@ -185,7 +188,7 @@ def test_groq_provider_invalid_key():
 
 
 def test_groq_provider_rate_limit():
-    provider = GroqProvider(api_key="test-key", timeout_seconds=5.0)
+    provider = GroqProvider(api_key="test-key", model="llama-3.3-70b-versatile", timeout_seconds=5.0)
     response = httpx.Response(
         429,
         json={"error": {"message": "rate limit"}},
@@ -198,7 +201,7 @@ def test_groq_provider_rate_limit():
 
 
 def test_groq_provider_timeout():
-    provider = GroqProvider(api_key="test-key", timeout_seconds=0.1)
+    provider = GroqProvider(api_key="test-key", model="llama-3.3-70b-versatile", timeout_seconds=0.1)
 
     with patch("httpx.Client.post", side_effect=httpx.TimeoutException("timed out")):
         with pytest.raises(ReportProviderError, match="timed out"):
@@ -206,7 +209,7 @@ def test_groq_provider_timeout():
 
 
 def test_groq_provider_network_error():
-    provider = GroqProvider(api_key="test-key", timeout_seconds=5.0)
+    provider = GroqProvider(api_key="test-key", model="llama-3.3-70b-versatile", timeout_seconds=5.0)
 
     with patch("httpx.Client.post", side_effect=httpx.ConnectError("connection failed")):
         with pytest.raises(ReportProviderError, match="network error"):
@@ -214,7 +217,7 @@ def test_groq_provider_network_error():
 
 
 def test_groq_provider_invalid_response():
-    provider = GroqProvider(api_key="test-key", timeout_seconds=5.0)
+    provider = GroqProvider(api_key="test-key", model="llama-3.3-70b-versatile", timeout_seconds=5.0)
     response = httpx.Response(
         200,
         json={"unexpected": "shape"},
