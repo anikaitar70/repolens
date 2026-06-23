@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 
@@ -16,11 +14,25 @@ class DuplicateLogicSummary(BaseModel):
     possible_duplicates: int = 0
 
 
+class ArchitectureSummary(BaseModel):
+    god_files: int = 0
+    hotspots: int = 0
+    coupling_issues: int = 0
+    circular_dependencies: int = 0
+
+
+class DependencySummary(BaseModel):
+    large_dependency_manifests: int = 0
+    missing_manifests: int = 0
+    concentration_issues: int = 0
+
+
 class Scores(BaseModel):
     maintainability: int
     security: int
     architecture: int
     dead_code: int
+    architecture_risk: int = 100
 
 
 class Metrics(BaseModel):
@@ -33,18 +45,25 @@ class Metrics(BaseModel):
     findings_by_category: dict[str, int] = Field(default_factory=dict)
     dead_code_summary: DeadCodeSummary = Field(default_factory=DeadCodeSummary)
     duplicate_logic_summary: DuplicateLogicSummary = Field(default_factory=DuplicateLogicSummary)
+    architecture_summary: ArchitectureSummary = Field(default_factory=ArchitectureSummary)
+    dependency_summary: DependencySummary = Field(default_factory=DependencySummary)
 
 
 class AnalysisResponse(BaseModel):
     repository_name: str
     metrics: Metrics
     scores: Scores
-    findings: list[dict[str, Any]]
-    ai_report: str
+    findings: list[dict]
+    ai_report: str = ""
+    prompt_export: str | None = None
 
 
-class GeminiPayload(BaseModel):
-    metrics: dict[str, Any]
-    scores: dict[str, int]
-    findings: list[dict[str, Any]]
-    top_findings: list[dict[str, Any]]
+class AiTestRequest(BaseModel):
+    provider: str
+    model: str | None = None
+    api_key: str
+
+
+class AiTestResponse(BaseModel):
+    status: str
+    message: str

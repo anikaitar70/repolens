@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from app.providers.openai_compatible import OpenAICompatibleProvider
 
-GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-class GroqProvider(OpenAICompatibleProvider):
+class OpenRouterProvider(OpenAICompatibleProvider):
     def __init__(
         self,
         api_key: str,
@@ -15,9 +13,13 @@ class GroqProvider(OpenAICompatibleProvider):
         timeout_seconds: float | None = None,
     ) -> None:
         super().__init__(
-            provider_name="groq",
-            api_url=GROQ_CHAT_URL,
+            provider_name="openrouter",
+            api_url=OPENROUTER_CHAT_URL,
             api_key=api_key,
             model=model,
             timeout_seconds=timeout_seconds,
+            extra_headers={
+                "HTTP-Referer": "https://repolens.local",
+                "X-Title": "RepoLens",
+            },
         )

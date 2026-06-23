@@ -1,24 +1,25 @@
 """
-Report generation service.
+Report generation service with BYOK support and prompt export mode.
 
 Architecture:
-  Report Service -> AI Provider Interface -> Groq / Gemini providers
+  Report Service -> AI Provider Interface -> Groq / OpenAI / Gemini / Anthropic / OpenRouter
 
-Payload limits (documented in README):
-  - REPORT_TOP_FINDINGS_LIMIT: max findings sent to the AI provider (default 15)
-  - REPORT_MAX_PAYLOAD_BYTES: hard cap on JSON payload size (default 12_000)
+Payload limits:
+  - REPORT_TOP_FINDINGS_LIMIT (default 15)
+  - REPORT_MAX_PAYLOAD_BYTES (default 12_000)
   - Top duplicate findings capped at 5
-  - Only structured fields are sent — never source code or raw files
+  - Only structured findings sent — never source code
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from app.config import settings
 from app.logging_config import get_logger
 from app.providers.base import ReportProviderError
-from app.providers.factory import get_report_provider
+from app.providers.factory import AiConfig, get_report_provider
 from app.summary import build_findings_by_category
 
 logger = get_logger(__name__)
@@ -39,7 +40,9 @@ Rules:
   4. Dead Code Assessment
   5. Duplicate Logic Assessment
   6. Architecture Assessment
-  7. Prioritized Refactoring Plan
+  7. Architectural Risks
+  8. Refactoring Roadmap
+  9. Priority Actions
 - Reference specific finding IDs or messages when discussing issues.
 - Be concise but actionable.
 """
@@ -61,6 +64,12 @@ _REPORT_FINDING_FIELDS = (
 )
 
 AI_UNAVAILABLE_HEADER = "# AI report unavailable.\n"
+
+
+@dataclass(frozen=True)
+class ReportResult:
+    ai_report: str
+    prompt_export: str | None
 
 
 def _trim_finding(finding: dict) -> dict:
@@ -92,6 +101,8 @@ def _build_report_payload(
             "findings_by_category": metrics.get("findings_by_category", {}),
             "dead_code_summary": metrics.get("dead_code_summary", {}),
             "duplicate_logic_summary": metrics.get("duplicate_logic_summary", {}),
+            "architecture_summary": metrics.get("architecture_summary", {}),
+            "dependency_summary": metrics.get("dependency_summary", {}),
         },
         "scores": scores,
         "top_findings": [_trim_finding(f) for f in top_findings[:findings_limit]],
@@ -100,6 +111,11 @@ def _build_report_payload(
             for f in top_findings
             if f.get("type") == "duplicate_logic"
         ][:5],
+        "top_architecture_findings": [
+            _trim_finding(f)
+            for f in top_findings
+            if f.get("category") == "architecture"
+        ][:8],
     }
 
 
@@ -113,9 +129,6 @@ def _build_size_limited_payload(
     top_findings: list[dict],
     findings_count: int,
 ) -> tuple[dict, int]:
-    """
-    Build a payload within REPORT_MAX_PAYLOAD_BYTES by reducing top findings count.
-    """
     limit = settings.report_top_findings_limit
     while limit >= 1:
         payload = _build_report_payload(
@@ -130,14 +143,38 @@ def _build_size_limited_payload(
             return payload, size
         limit -= 1
 
-    payload = _build_report_payload(
-        metrics,
-        scores,
-        [],
-        findings_count,
-        findings_limit=0,
-    )
+    payload = _build_report_payload(metrics, scores, [], findings_count, findings_limit=0)
     return payload, _payload_size(payload)
+
+
+def build_prompt_export(
+    metrics: dict,
+    scores: dict,
+    findings: list[dict],
+    top: list[dict],
+) -> str:
+    payload, payload_bytes = _build_size_limited_payload(metrics, scores, top, len(findings))
+    return (
+        "You are a senior software architect. Generate a professional repository audit report "
+        "from the structured analysis data below.\n\n"
+        "Include these sections:\n"
+        "1. Executive Summary\n"
+        "2. Security Assessment\n"
+        "3. Maintainability Assessment\n"
+        "4. Dead Code Assessment\n"
+        "5. Duplicate Logic Assessment\n"
+        "6. Architecture Assessment\n"
+        "7. Architectural Risks\n"
+        "8. Refactoring Roadmap\n"
+        "9. Priority Actions\n\n"
+        "Rules:\n"
+        "- Use ONLY the data provided.\n"
+        "- Do NOT invent issues.\n"
+        "- Do NOT request source code.\n"
+        "- Write in clear markdown.\n\n"
+        f"Payload size: {payload_bytes} bytes\n\n"
+        f"```json\n{json.dumps(payload, indent=2)}\n```"
+    )
 
 
 def generate_report(
@@ -145,13 +182,17 @@ def generate_report(
     scores: dict,
     findings: list[dict],
     top: list[dict] | None = None,
-) -> str:
+    ai_config: AiConfig | None = None,
+) -> ReportResult:
     trimmed_top = (top or [])[: settings.report_top_findings_limit]
-    provider = get_report_provider()
+    provider = get_report_provider(ai_config)
 
     if provider is None:
-        logger.info("No AI report provider configured; using fallback report")
-        return _fallback_report(metrics, scores, findings, trimmed_top)
+        logger.info("No AI provider configured; returning prompt export")
+        return ReportResult(
+            ai_report="",
+            prompt_export=build_prompt_export(metrics, scores, findings, trimmed_top),
+        )
 
     payload, payload_bytes = _build_size_limited_payload(
         metrics,
@@ -176,127 +217,41 @@ def generate_report(
     )
 
     try:
-        return provider.generate(SYSTEM_PROMPT, user_prompt)
+        report = provider.generate(SYSTEM_PROMPT, user_prompt)
+        return ReportResult(ai_report=report, prompt_export=None)
     except ReportProviderError as exc:
         logger.warning("%s report generation failed: %s", provider.name.title(), exc)
-        return _unavailable_report(metrics, scores, findings, trimmed_top)
+        return ReportResult(
+            ai_report=AI_UNAVAILABLE_HEADER.strip(),
+            prompt_export=build_prompt_export(metrics, scores, findings, trimmed_top),
+        )
     except Exception:
         logger.exception("%s report generation failed unexpectedly", provider.name.title())
-        return _unavailable_report(metrics, scores, findings, trimmed_top)
+        return ReportResult(
+            ai_report=AI_UNAVAILABLE_HEADER.strip(),
+            prompt_export=build_prompt_export(metrics, scores, findings, trimmed_top),
+        )
 
 
-def _unavailable_report(
-    metrics: dict,
-    scores: dict,
-    findings: list[dict],
-    top: list[dict],
-) -> str:
-    return (
-        AI_UNAVAILABLE_HEADER
-        + "\n---\n\n"
-        + _fallback_report(metrics, scores, findings, top)
-    )
+def verify_ai_connection(ai_config: AiConfig) -> tuple[str, str]:
+    """Test provider connectivity. Returns (status, message). Never logs API keys."""
+    provider = get_report_provider(ai_config)
+    if provider is None:
+        return "invalid", "API key is required."
 
-
-def _category_findings(findings: list[dict], category: str, limit: int = 8) -> list[dict]:
-    return [f for f in findings if f.get("category") == category][:limit]
-
-
-def _fallback_report(
-    metrics: dict,
-    scores: dict,
-    findings: list[dict],
-    top: list[dict],
-) -> str:
-    high_count = sum(1 for f in findings if f.get("severity") == "high")
-    medium_count = sum(1 for f in findings if f.get("severity") == "medium")
-    low_count = sum(1 for f in findings if f.get("severity") == "low")
-    by_category = metrics.get("findings_by_category", build_findings_by_category(findings))
-    dead_code = metrics.get("dead_code_summary", {})
-
-    lines = [
-        "# Repository Audit Report",
-        "",
-        "## Executive Summary",
-        "",
-        f"This repository contains **{metrics.get('files_scanned', 0)}** source files "
-        f"with **{metrics.get('total_lines', 0)}** total lines of code. "
-        f"The analysis identified **{len(findings)}** issues "
-        f"({high_count} high, {medium_count} medium, {low_count} low severity).",
-        "",
-        "### Score Breakdown",
-        "",
-        f"- **Maintainability:** {scores.get('maintainability', 0)}/100",
-        f"- **Security:** {scores.get('security', 0)}/100",
-        f"- **Architecture:** {scores.get('architecture', 0)}/100",
-        f"- **Dead Code:** {scores.get('dead_code', 0)}/100",
-        "",
-        "### Findings by Category",
-        "",
-    ]
-
-    for category, count in sorted(by_category.items()):
-        lines.append(f"- **{category.replace('_', ' ').title()}:** {count}")
-
-    lines.extend(["", "## Security Assessment", ""])
-    security = _category_findings(findings, "security")
-    if security:
-        for item in security:
-            lines.append(f"- **{item.get('file')}:** {item.get('message')}")
-    else:
-        lines.append("No security issues detected.")
-
-    lines.extend(["", "## Maintainability Assessment", ""])
-    maintainability = [
-        f for f in findings if f.get("category") == "maintainability" and f.get("type") != "duplicate_logic"
-    ]
-    if maintainability:
-        for item in maintainability[:8]:
-            lines.append(f"- {item.get('message')}")
-    else:
-        lines.append("No maintainability issues detected.")
-
-    lines.extend(["", "## Dead Code Assessment", ""])
-    lines.append(
-        f"Unused imports: **{dead_code.get('unused_imports', 0)}**, "
-        f"unused variables: **{dead_code.get('unused_variables', 0)}**, "
-        f"unused functions: **{dead_code.get('unused_functions', 0)}**."
-    )
-    dead = _category_findings(findings, "dead_code")
-    for item in dead[:8]:
-        lines.append(f"- {item.get('message')}")
-
-    lines.extend(["", "## Duplicate Logic Assessment", ""])
-    duplicate_items = [f for f in findings if f.get("type") == "duplicate_logic"]
-    dup_summary = metrics.get("duplicate_logic_summary", {})
-    lines.append(
-        f"Duplicate pairs: **{dup_summary.get('duplicate_pairs', 0)}** "
-        f"(high: {dup_summary.get('high_confidence_duplicates', 0)}, "
-        f"medium: {dup_summary.get('medium_confidence_duplicates', 0)}, "
-        f"possible: {dup_summary.get('possible_duplicates', 0)})."
-    )
-    if duplicate_items:
-        for item in duplicate_items[:8]:
-            lines.append(f"- {item.get('message')}")
-    else:
-        lines.append("No semantic duplicate logic detected.")
-
-    lines.extend(["", "## Architecture Assessment", ""])
-    architecture = _category_findings(findings, "architecture")
-    if architecture:
-        for item in architecture:
-            lines.append(f"- {item.get('message')}")
-    else:
-        lines.append("No architecture issues detected.")
-
-    lines.extend(["", "## Prioritized Refactoring Plan", ""])
-    prioritized = top or findings[:10]
-    if prioritized:
-        for index, item in enumerate(prioritized, start=1):
-            lines.append(f"{index}. [{item.get('severity', 'unknown')}] {item.get('message')}")
-    else:
-        lines.append("No immediate actions required.")
-
-    lines.append("")
-    lines.append("*Automated summary generated without AI.*")
-    return "\n".join(lines)
+    try:
+        provider.generate(
+            "You are a connectivity test assistant.",
+            "Reply with exactly: connected",
+        )
+        return "connected", "Connection successful."
+    except ReportProviderError as exc:
+        message = str(exc).lower()
+        if "invalid" in message or "401" in message:
+            return "invalid", "Invalid API key."
+        if "rate limit" in message:
+            return "error", "Rate limit exceeded. Try again later."
+        return "error", str(exc)
+    except Exception:
+        logger.exception("AI connection test failed")
+        return "error", "Provider error. Check model and API key."

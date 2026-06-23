@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import google.generativeai as genai
 
-from app.config import settings
 from app.logging_config import get_logger
 from app.providers.base import ReportProvider, ReportProviderError
 
@@ -10,15 +9,11 @@ logger = get_logger(__name__)
 
 
 class GeminiProvider(ReportProvider):
-    """Legacy Gemini provider for optional backward compatibility."""
+    """Legacy Gemini provider."""
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        model: str | None = None,
-    ) -> None:
-        self._api_key = api_key if api_key is not None else settings.gemini_api_key
-        self._model = model if model is not None else settings.gemini_model
+    def __init__(self, api_key: str, model: str) -> None:
+        self._api_key = api_key
+        self._model = model
 
     @property
     def name(self) -> str:
@@ -45,5 +40,5 @@ class GeminiProvider(ReportProvider):
         if not text:
             raise ReportProviderError("Gemini returned an empty report.")
 
-        logger.info("Gemini report generated successfully (model=%s)", self._model)
+        logger.info("Gemini report generated (model=%s)", self._model)
         return text
