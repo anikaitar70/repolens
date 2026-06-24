@@ -92,6 +92,42 @@ client_max_body_size 150m;
 
 Then `docker exec yoga-nginx-1 nginx -s reload`.
 
+### Still routes to nirvanayoga.org / wrong site
+
+The VPS can serve the correct cert while your browser still hits the wrong vhost if **`rl.anikait.page` appears in multiple nginx configs**. nginx uses the **first** matching `server_name` block when duplicates exist.
+
+```bash
+# Find every config that mentions rl.anikait.page
+grep -rn "rl.anikait.page" /opt/yoga/nginx/conf.d/
+
+# rl.anikait.page must ONLY be in repolens.conf — remove it from other files, e.g.:
+#   production-ssl.conf, initial.conf, *.bak
+nano /opt/yoga/nginx/conf.d/production-ssl.conf   # remove rl.anikait.page from server_name if present
+
+# Re-apply RepoLens config and reload
+cd /opt/repolens
+cp deploy/nginx/repolens-yoga.conf.example /opt/yoga/nginx/conf.d/repolens.conf
+docker exec yoga-nginx-1 nginx -t
+docker exec yoga-nginx-1 nginx -s reload
+```
+
+Run the bundled checker:
+
+```bash
+cd /opt/repolens
+bash deploy/verify-rl-nginx.sh
+```
+
+From your **local PC** (not VPS), also check DNS/IPv6:
+
+```bash
+nslookup rl.anikait.page
+curl -4 -I https://rl.anikait.page/
+curl -6 -I https://rl.anikait.page/   # fails if no AAAA — good
+```
+
+If local `curl -4` shows the wrong cert but VPS curl is correct, flush browser cache or test in incognito.
+
 ### 502 Bad Gateway on https://rl.anikait.page
 
 Usually the RepoLens containers are down, or yoga-nginx cannot reach them.
