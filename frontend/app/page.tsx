@@ -11,6 +11,7 @@ import AuditReport from "@/components/AuditReport";
 import CategoryBreakdown from "@/components/CategoryBreakdown";
 import DuplicateLogicTable from "@/components/DuplicateLogicTable";
 import FindingsTable from "@/components/FindingsTable";
+import ProjectAbout from "@/components/ProjectAbout";
 import Hero from "@/components/Hero";
 import PromptExport from "@/components/PromptExport";
 import ScoreCards from "@/components/ScoreCards";
@@ -82,6 +83,7 @@ export default function HomePage() {
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         {state === "idle" && (
           <div className="space-y-10">
+            <ProjectAbout />
             <Hero />
             <AiSettingsPanel onChange={handleSettingsChange} />
             <RepoInputPanel
@@ -147,7 +149,15 @@ export default function HomePage() {
 
       <footer className="mt-16 border-t border-slate-200 bg-white py-6">
         <div className="mx-auto max-w-6xl px-4 text-center text-sm text-slate-500 sm:px-6">
-          RepoLens — Analysis first, AI second.
+          RepoLens — Analysis first, AI second.{" "}
+          <a
+            href="https://anikait.page"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700"
+          >
+            Built by Anikait
+          </a>
         </div>
       </footer>
     </main>

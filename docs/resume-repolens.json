@@ -1,0 +1,23 @@
+{
+  "id": "repolens",
+  "title": "RepoLens",
+  "category": "devtools",
+  "featured": true,
+  "url": "https://rl.anikait.page",
+  "portfolio": "https://anikait.page",
+  "problem": "Code reviews miss structural issues — large files, security smells, dead code, circular imports, and duplicate logic — until they become expensive refactors or production incidents.",
+  "solution": "Built a full-stack repository audit platform with deterministic analyzers (Tree-sitter AST, semantic duplicate detection, architecture intelligence) and optional BYOK AI reports. Supports ZIP upload, client-side folder packaging, and Git URL analysis with production deployment on Docker and Nginx.",
+  "technologies": [
+    "Next.js",
+    "TypeScript",
+    "FastAPI",
+    "Python",
+    "Tree-sitter",
+    "Sentence Transformers",
+    "Docker",
+    "Nginx",
+    "Tailwind CSS",
+    "Groq",
+    "OpenAI"
+  ]
+}

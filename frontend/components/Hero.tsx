@@ -11,8 +11,8 @@ export default function Hero() {
         AI-Powered Repository Audit
       </p>
       <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
-        Upload a ZIP of your source code. Deterministic analyzers find the issues.
-        Gemini writes the professional audit report.
+        Upload a ZIP, select a local folder, or paste a Git URL. Deterministic analyzers find
+        the issues; optional BYOK AI writes the audit report.
       </p>
     </section>
   );
