@@ -56,7 +56,11 @@ connect_yoga_network() {
 }
 
 echo "==> Pulling latest from git..."
-git pull --ff-only origin main
+if ! git pull --ff-only origin main; then
+  echo "==> Local changes blocked pull; resetting deploy/deploy.sh and retrying..."
+  git checkout -- deploy/deploy.sh 2>/dev/null || true
+  git pull --ff-only origin main
+fi
 
 echo "==> Building and starting containers..."
 $COMPOSE up -d --build
