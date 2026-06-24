@@ -21,6 +21,7 @@ cd /opt/repolens
 chmod +x deploy/deploy.sh
 cp deploy/env.production.example .env
 
+chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
@@ -48,6 +49,7 @@ docker exec yoga-nginx-1 nginx -s reload
 ```bash
 ssh ubuntu@51.79.251.45
 cd /opt/repolens
+chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
@@ -72,6 +74,7 @@ docker image prune -af
 
 cd /opt/repolens
 git pull
+chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
@@ -112,6 +115,7 @@ After any deploy, reconnect the yoga network and verify:
 ```bash
 cd /opt/repolens
 git pull
+chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
