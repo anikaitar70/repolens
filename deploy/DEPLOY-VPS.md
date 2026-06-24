@@ -55,3 +55,36 @@ cd /opt/repolens
 
 - https://rl.anikait.page
 - `curl https://rl.anikait.page/health`
+
+## Troubleshooting
+
+### `no space left on device` during backend build
+
+The backend uses `sentence-transformers`, which pulls in PyTorch. The Dockerfile installs **CPU-only** PyTorch to avoid huge CUDA libraries. If a build still fails:
+
+```bash
+df -h
+docker system df
+
+# Free Docker build cache and unused images (safe if yoga/repolens can be rebuilt)
+docker builder prune -af
+docker image prune -af
+
+cd /opt/repolens
+git pull
+./deploy/deploy.sh
+```
+
+Also set in `/opt/repolens/.env`:
+
+```
+MAX_UPLOAD_SIZE=157286400
+```
+
+And in `/opt/yoga/nginx/conf.d/repolens.conf`:
+
+```
+client_max_body_size 150m;
+```
+
+Then `docker exec yoga-nginx-1 nginx -s reload`.
