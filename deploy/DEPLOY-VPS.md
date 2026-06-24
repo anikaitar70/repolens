@@ -88,3 +88,39 @@ client_max_body_size 150m;
 ```
 
 Then `docker exec yoga-nginx-1 nginx -s reload`.
+
+### 502 Bad Gateway on https://rl.anikait.page
+
+Usually the RepoLens containers are down, or yoga-nginx cannot reach them.
+
+```bash
+cd /opt/repolens
+docker compose -f docker-compose.prod.yml ps
+
+# Should return {"status":"ok"}
+curl -s http://127.0.0.1:8010/health
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3010/
+
+docker logs repolens-backend-1 --tail 80
+docker logs repolens-frontend-1 --tail 80
+```
+
+**yoga nginx must proxy to container names**, not `127.0.0.1` (that points inside the nginx container itself). Use `deploy/nginx/repolens-yoga.conf.example` as the template for `/opt/yoga/nginx/conf.d/repolens.conf`.
+
+After any deploy, reconnect the yoga network and verify:
+
+```bash
+cd /opt/repolens
+git pull
+./deploy/deploy.sh
+```
+
+Or manually:
+
+```bash
+YOGA_NET=$(docker inspect yoga-nginx-1 --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' | awk '{print $1}')
+docker network connect "$YOGA_NET" repolens-backend-1 2>/dev/null || true
+docker network connect "$YOGA_NET" repolens-frontend-1 2>/dev/null || true
+docker exec yoga-nginx-1 wget -qO- http://repolens-frontend-1:3000/ | head
+docker exec yoga-nginx-1 nginx -s reload
+```

@@ -1,0 +1,51 @@
+# Nginx site for RepoLens behind the yoga Docker stack (rl.anikait.page)
+# Copy to: /opt/yoga/nginx/conf.d/repolens.conf
+#
+# yoga-nginx must reach repolens containers by name — NOT 127.0.0.1
+# (127.0.0.1 inside the nginx container is the nginx container itself).
+#
+# After deploy, reconnect network if needed:
+#   cd /opt/repolens && ./deploy/deploy.sh
+#
+# Reload:
+#   docker exec yoga-nginx-1 nginx -s reload
+
+server {
+    listen 80;
+    server_name rl.anikait.page;
+
+    client_max_body_size 150m;
+
+    location /api/ {
+        proxy_pass http://repolens-backend-1:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header X-AI-Provider $http_x_ai_provider;
+        proxy_set_header X-AI-Model $http_x_ai_model;
+        proxy_set_header X-AI-Api-Key $http_x_ai_api_key;
+
+        proxy_read_timeout 180s;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 180s;
+    }
+
+    location /health {
+        proxy_pass http://repolens-backend-1:8000/health;
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        proxy_pass http://repolens-frontend-1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
