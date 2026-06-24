@@ -9,7 +9,13 @@ IGNORED_DIRS = {
     ".next",
     "coverage",
     "venv",
+    ".venv",
+    "env",
     "__pycache__",
+    ".turbo",
+    ".cache",
+    "target",
+    "vendor",
 }
 
 SUPPORTED_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx"}

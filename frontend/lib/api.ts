@@ -16,8 +16,8 @@ export interface UploadLimits {
 }
 
 const DEFAULT_LIMITS: UploadLimits = {
-  max_upload_bytes: 104_857_600,
-  max_upload_label: "100 MB",
+  max_upload_bytes: 157_286_400,
+  max_upload_label: "150 MB",
   max_extracted_bytes: 262_144_000,
   max_extracted_label: "250 MB",
   max_extracted_files: 5000,
@@ -40,8 +40,8 @@ async function parseApiError(response: Response, fallback: string): Promise<stri
       return error.detail;
     }
     return (
-      "File or repository is too large. Maximum ZIP size is 100 MB. " +
-      "Exclude node_modules, .git, and build folders before zipping."
+      "File or repository is too large. Maximum ZIP size is 150 MB. " +
+      "Try the Local folder option or exclude node_modules, .git, and build folders."
     );
   }
 
@@ -85,6 +85,32 @@ export async function analyzeRepository(
 
   if (!response.ok) {
     throw new Error(await parseApiError(response, "Analysis failed"));
+  }
+
+  return normalizeAnalysisResult(await response.json());
+}
+
+export async function analyzeGitRepository(
+  url: string,
+  branch?: string,
+  token?: string,
+  aiSettings?: AiSettings,
+): Promise<AnalysisResult> {
+  const response = await fetch(`${API_URL}/api/analyze/git`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...aiHeaders(aiSettings),
+    },
+    body: JSON.stringify({
+      url,
+      branch: branch || null,
+      token: token || null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiError(response, "Git analysis failed"));
   }
 
   return normalizeAnalysisResult(await response.json());

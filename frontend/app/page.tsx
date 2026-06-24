@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { analyzeRepository } from "@/lib/api";
+import { analyzeGitRepository, analyzeRepository } from "@/lib/api";
 import { DEFAULT_AI_SETTINGS, loadAiSettings, type AiSettings } from "@/lib/aiSettings";
 import type { AnalysisResult, AnalysisState } from "@/types/analysis";
 import AiSettingsPanel from "@/components/AiSettingsPanel";
@@ -14,13 +14,15 @@ import FindingsTable from "@/components/FindingsTable";
 import Hero from "@/components/Hero";
 import PromptExport from "@/components/PromptExport";
 import ScoreCards from "@/components/ScoreCards";
-import UploadArea from "@/components/UploadArea";
+import RepoInputPanel from "@/components/RepoInputPanel";
 
 export default function HomePage() {
   const [state, setState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
+
+  const [progressMessage, setProgressMessage] = useState("Analyzing repository...");
 
   useEffect(() => {
     setAiSettings(loadAiSettings());
@@ -30,19 +32,29 @@ export default function HomePage() {
     setAiSettings(settings);
   }, []);
 
-  const handleUpload = async (file: File) => {
+  const runAnalysis = async (task: () => Promise<AnalysisResult>) => {
     setState("analyzing");
     setError(null);
     setResult(null);
 
     try {
-      const data = await analyzeRepository(file, aiSettings);
+      const data = await task();
       setResult(data);
       setState("complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
       setState("error");
     }
+  };
+
+  const handleUpload = async (file: File) => {
+    setProgressMessage("Analyzing repository...");
+    await runAnalysis(() => analyzeRepository(file, aiSettings));
+  };
+
+  const handleGitSubmit = async (url: string, branch?: string, token?: string) => {
+    setProgressMessage("Cloning repository...");
+    await runAnalysis(() => analyzeGitRepository(url, branch, token, aiSettings));
   };
 
   const handleReset = () => {
@@ -72,17 +84,22 @@ export default function HomePage() {
           <div className="space-y-10">
             <Hero />
             <AiSettingsPanel onChange={handleSettingsChange} />
-            <UploadArea onUpload={handleUpload} onError={(message) => {
-              setError(message);
-              setState("error");
-            }} />
+            <RepoInputPanel
+              onUpload={handleUpload}
+              onFolderPrepare={setProgressMessage}
+              onGitSubmit={handleGitSubmit}
+              onError={(message) => {
+                setError(message);
+                setState("error");
+              }}
+            />
           </div>
         )}
 
         {state === "analyzing" && (
           <div className="space-y-10">
             <Hero />
-            <AnalysisProgress />
+            <AnalysisProgress message={progressMessage} />
           </div>
         )}
 

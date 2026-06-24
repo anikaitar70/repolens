@@ -67,3 +67,9 @@ class AiTestRequest(BaseModel):
 class AiTestResponse(BaseModel):
     status: str
     message: str
+
+
+class GitAnalyzeRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=500)
+    branch: str | None = Field(default=None, max_length=200)
+    token: str | None = Field(default=None, max_length=500)

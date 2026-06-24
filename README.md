@@ -7,7 +7,8 @@ AI-assisted repository architecture review platform. Deterministic analyzers dis
 ## Features
 
 ### Core Analysis (Phases 1–3)
-- ZIP file upload (Python, JavaScript, TypeScript)
+- Three ways to analyze: **ZIP upload**, **local folder** (auto-zips, skips node_modules/.git/dist), or **Git URL** (GitHub/GitLab/Bitbucket)
+- Python, JavaScript, and TypeScript support
 - Tree-sitter AST parsing with shared cache across analyzers
 - Large file / function detection, complexity, security patterns
 - Circular import detection, dead code detection
@@ -140,7 +141,7 @@ App: http://localhost:3000
 | `REPORT_TOP_FINDINGS_LIMIT`| Max findings sent to AI provider         | `15`    |
 | `REPORT_MAX_PAYLOAD_BYTES` | Max JSON payload size for AI requests    | `12000` |
 | `REPORT_TIMEOUT_SECONDS`   | AI request timeout in seconds            | `60`    |
-| `MAX_UPLOAD_SIZE`          | Max upload size in bytes                 | `104857600` (100 MB) |
+| `MAX_UPLOAD_SIZE`          | Max upload size in bytes                 | `157286400` (150 MB) |
 | `MAX_EXTRACTED_SIZE`       | Max extracted archive size in bytes      | `262144000` (250 MB) |
 | `MAX_EXTRACTED_FILES`      | Max files allowed in archive               | `5000` |
 | `UPLOAD_DIRECTORY`         | Temp directory for uploads               | `/tmp/repolens/uploads` |
@@ -205,11 +206,29 @@ docker compose up --build
 
 ### `POST /api/analyze`
 
-Upload a ZIP file containing a source code repository.
+Upload a ZIP file containing a source code repository (max 150 MB by default).
 
 **Request:** `multipart/form-data` with field `file` (ZIP)
 
-**Response:**
+### `POST /api/analyze/git`
+
+Clone and analyze a public git repository.
+
+**Request:** `application/json`
+
+```json
+{
+  "url": "https://github.com/user/repo",
+  "branch": "main",
+  "token": null
+}
+```
+
+### `GET /api/limits`
+
+Returns current upload and extraction limits for the UI.
+
+**Response (analyze):**
 
 ```json
 {

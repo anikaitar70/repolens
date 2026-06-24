@@ -1,4 +1,5 @@
 import concurrent.futures
+import shutil
 import tempfile
 import zipfile
 from pathlib import Path
@@ -10,10 +11,11 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.exceptions import RepoLensError
 from app.logging_config import get_logger, setup_logging
-from app.models import AiTestRequest, AiTestResponse, AnalysisResponse
-from app.pipeline import analyze_zip
+from app.models import AiTestRequest, AiTestResponse, AnalysisResponse, GitAnalyzeRequest
+from app.pipeline import analyze_directory, analyze_zip
 from app.limits import get_public_limits, upload_too_large_message
 from app.providers.factory import AiConfig
+from app.services.git_service import clone_repository, normalize_git_url
 from app.services.report_service import verify_ai_connection
 
 setup_logging()
@@ -141,6 +143,63 @@ async def analyze(
         raise HTTPException(status_code=500, detail=detail) from None
     finally:
         tmp_path.unlink(missing_ok=True)
+
+
+def _run_git_analysis_with_timeout(
+    url: str,
+    branch: str | None,
+    token: str | None,
+    ai_config: AiConfig | None,
+) -> AnalysisResponse:
+    clone_dir = clone_repository(url, branch, token)
+    work_parent = clone_dir.parent
+    _, repo_name = normalize_git_url(url)
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(analyze_directory, clone_dir, repo_name, ai_config)
+            return future.result(timeout=settings.max_analysis_seconds)
+    finally:
+        shutil.rmtree(work_parent, ignore_errors=True)
+
+
+@app.post("/api/analyze/git", response_model=AnalysisResponse)
+async def analyze_git(
+    body: GitAnalyzeRequest,
+    x_ai_provider: str | None = Header(default=None, alias="X-AI-Provider"),
+    x_ai_model: str | None = Header(default=None, alias="X-AI-Model"),
+    x_ai_api_key: str | None = Header(default=None, alias="X-AI-Api-Key"),
+) -> AnalysisResponse:
+    ai_config = _parse_ai_config(x_ai_provider, x_ai_model, x_ai_api_key)
+    logger.info("Git analysis started for URL host")
+
+    try:
+        result = _run_git_analysis_with_timeout(
+            body.url,
+            body.branch,
+            body.token,
+            ai_config,
+        )
+        logger.info(
+            "Git analysis completed for %s: %d findings",
+            result.repository_name,
+            len(result.findings),
+        )
+        return result
+    except concurrent.futures.TimeoutError:
+        logger.warning("Git analysis timed out")
+        raise HTTPException(
+            status_code=504,
+            detail=f"Analysis exceeded time limit of {settings.max_analysis_seconds} seconds.",
+        ) from None
+    except RepoLensError:
+        raise
+    except Exception:
+        logger.exception("Git analysis failed")
+        detail = "Repository analysis failed."
+        if settings.debug:
+            raise
+        raise HTTPException(status_code=500, detail=detail) from None
 
 
 @app.post("/api/ai/test", response_model=AiTestResponse)

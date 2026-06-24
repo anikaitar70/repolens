@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     large_function_threshold: int = 50
     complexity_threshold: int = 10
 
-    max_upload_size: int = Field(default=104_857_600, description="Max upload size in bytes (100 MB)")
+    max_upload_size: int = Field(default=157_286_400, description="Max upload size in bytes (150 MB)")
     max_extracted_size: int = Field(
         default=262_144_000, description="Max total extracted size in bytes (250 MB)"
     )
@@ -30,6 +30,12 @@ class Settings(BaseSettings):
         default=20_971_520, description="Max single extracted file size in bytes (20 MB)"
     )
     max_analysis_seconds: int = Field(default=120, description="Max analysis runtime in seconds")
+    max_clone_seconds: int = Field(default=120, description="Max git clone runtime in seconds")
+    git_clone_depth: int = Field(default=1, description="Shallow clone depth")
+    allowed_git_hosts: str = Field(
+        default="github.com,gitlab.com,bitbucket.org",
+        description="Comma-separated allowed git hostnames",
+    )
     report_top_findings_limit: int = Field(
         default=15, description="Max findings sent to the AI report provider"
     )

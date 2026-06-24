@@ -54,6 +54,15 @@ def test_analyze_rejects_oversized_upload(monkeypatch):
     assert "too large" in response.json()["detail"].lower()
 
 
+def test_analyze_git_rejects_invalid_url():
+    response = client.post(
+        "/api/analyze/git",
+        json={"url": "https://evil.example.com/user/repo.git"},
+    )
+    assert response.status_code == 400
+    assert "not allowed" in response.json()["detail"].lower()
+
+
 def test_analyze_valid_python_repo():
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
