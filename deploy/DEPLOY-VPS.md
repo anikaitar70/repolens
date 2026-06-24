@@ -108,7 +108,7 @@ docker logs repolens-backend-1 --tail 80
 docker logs repolens-frontend-1 --tail 80
 ```
 
-**yoga nginx must proxy to container names**, not `127.0.0.1` (that points inside the nginx container itself). Use `deploy/nginx/repolens-yoga.conf.example` as the template for `/opt/yoga/nginx/conf.d/repolens.conf`.
+**yoga nginx must proxy to container names**, not `127.0.0.1` (that points inside the nginx container itself). Use `deploy/nginx/repolens-yoga.conf.example` as the template for `/opt/yoga/nginx/conf.d/repolens.conf` — it includes both `80 -> 443` redirect and a dedicated `443 ssl` block for `rl.anikait.page`.
 
 After any deploy, reconnect the yoga network and verify:
 
