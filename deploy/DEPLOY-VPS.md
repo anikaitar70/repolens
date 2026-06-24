@@ -28,11 +28,19 @@ cp deploy/env.production.example .env
 
 ## Nginx (new site only)
 
+`client_max_body_size` must be at least **100m** so large ZIP uploads are not rejected with HTTP 413 before they reach the backend.
+
 ```bash
 sudo cp /opt/repolens/deploy/nginx/repolens.conf.example /etc/nginx/sites-available/repolens
 sudo ln -sf /etc/nginx/sites-available/repolens /etc/nginx/sites-enabled/repolens
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d rl.anikait.page
+```
+
+**Yoga stack (current production):** RepoLens is proxied from `/opt/yoga/nginx/conf.d/repolens.conf`. After deploy, ensure that file includes `client_max_body_size 100m;` inside the `server` block, then reload:
+
+```bash
+docker exec yoga-nginx-1 nginx -s reload
 ```
 
 ## Git deploy (after you push to GitHub)

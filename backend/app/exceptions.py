@@ -17,6 +17,13 @@ class ZipSecurityError(RepoLensError):
         super().__init__(message, status_code=400)
 
 
+class UploadLimitError(RepoLensError):
+    """Archive or upload exceeds configured size limits."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=413)
+
+
 class AnalysisError(RepoLensError):
     def __init__(self, message: str) -> None:
         super().__init__(message, status_code=500)

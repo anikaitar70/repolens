@@ -12,6 +12,7 @@ from app.exceptions import RepoLensError
 from app.logging_config import get_logger, setup_logging
 from app.models import AiTestRequest, AiTestResponse, AnalysisResponse
 from app.pipeline import analyze_zip
+from app.limits import get_public_limits, upload_too_large_message
 from app.providers.factory import AiConfig
 from app.services.report_service import verify_ai_connection
 
@@ -42,6 +43,11 @@ async def repolens_error_handler(_request: Request, exc: RepoLensError) -> JSONR
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/limits")
+async def limits() -> dict:
+    return get_public_limits()
 
 
 def _parse_ai_config(
@@ -85,7 +91,7 @@ async def analyze(
     if len(content) > settings.max_upload_size:
         raise HTTPException(
             status_code=413,
-            detail=f"Upload exceeds maximum size of {settings.max_upload_size} bytes.",
+            detail=upload_too_large_message(len(content)),
         )
 
     upload_dir = Path(settings.upload_directory)

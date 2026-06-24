@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { analyzeRepository } from "@/lib/api";
-import { loadAiSettings, type AiSettings } from "@/lib/aiSettings";
+import { DEFAULT_AI_SETTINGS, loadAiSettings, type AiSettings } from "@/lib/aiSettings";
 import type { AnalysisResult, AnalysisState } from "@/types/analysis";
 import AiSettingsPanel from "@/components/AiSettingsPanel";
 import AnalysisProgress from "@/components/AnalysisProgress";
@@ -20,7 +20,11 @@ export default function HomePage() {
   const [state, setState] = useState<AnalysisState>("idle");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+  const [aiSettings, setAiSettings] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
+
+  useEffect(() => {
+    setAiSettings(loadAiSettings());
+  }, []);
 
   const handleSettingsChange = useCallback((settings: AiSettings) => {
     setAiSettings(settings);
@@ -68,7 +72,10 @@ export default function HomePage() {
           <div className="space-y-10">
             <Hero />
             <AiSettingsPanel onChange={handleSettingsChange} />
-            <UploadArea onUpload={handleUpload} />
+            <UploadArea onUpload={handleUpload} onError={(message) => {
+              setError(message);
+              setState("error");
+            }} />
           </div>
         )}
 

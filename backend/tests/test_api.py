@@ -31,6 +31,29 @@ def test_analyze_rejects_empty_zip():
     assert response.status_code == 400
 
 
+def test_limits_endpoint():
+    from app.config import settings
+
+    response = client.get("/api/limits")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["max_upload_bytes"] == settings.max_upload_size
+    assert "max_upload_label" in data
+
+
+def test_analyze_rejects_oversized_upload(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "max_upload_size", 100)
+
+    response = client.post(
+        "/api/analyze",
+        files={"file": ("big.zip", b"x" * 200, "application/zip")},
+    )
+    assert response.status_code == 413
+    assert "too large" in response.json()["detail"].lower()
+
+
 def test_analyze_valid_python_repo():
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:

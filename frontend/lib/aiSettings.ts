@@ -24,15 +24,21 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   openrouter: "OpenRouter",
 };
 
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "groq",
+  model: DEFAULT_MODELS.groq,
+  apiKey: "",
+};
+
 export function loadAiSettings(): AiSettings {
   if (typeof window === "undefined") {
-    return { provider: "groq", model: DEFAULT_MODELS.groq, apiKey: "" };
+    return DEFAULT_AI_SETTINGS;
   }
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { provider: "groq", model: DEFAULT_MODELS.groq, apiKey: "" };
+      return DEFAULT_AI_SETTINGS;
     }
     const parsed = JSON.parse(raw) as Partial<AiSettings>;
     const provider = (parsed.provider ?? "groq") as AiProvider;
@@ -42,7 +48,7 @@ export function loadAiSettings(): AiSettings {
       apiKey: parsed.apiKey ?? "",
     };
   } catch {
-    return { provider: "groq", model: DEFAULT_MODELS.groq, apiKey: "" };
+    return DEFAULT_AI_SETTINGS;
   }
 }
 

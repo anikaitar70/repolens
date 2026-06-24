@@ -140,8 +140,8 @@ App: http://localhost:3000
 | `REPORT_TOP_FINDINGS_LIMIT`| Max findings sent to AI provider         | `15`    |
 | `REPORT_MAX_PAYLOAD_BYTES` | Max JSON payload size for AI requests    | `12000` |
 | `REPORT_TIMEOUT_SECONDS`   | AI request timeout in seconds            | `60`    |
-| `MAX_UPLOAD_SIZE`          | Max upload size in bytes                 | `26214400` (25 MB) |
-| `MAX_EXTRACTED_SIZE`       | Max extracted archive size in bytes      | `104857600` (100 MB) |
+| `MAX_UPLOAD_SIZE`          | Max upload size in bytes                 | `104857600` (100 MB) |
+| `MAX_EXTRACTED_SIZE`       | Max extracted archive size in bytes      | `262144000` (250 MB) |
 | `MAX_EXTRACTED_FILES`      | Max files allowed in archive               | `5000` |
 | `UPLOAD_DIRECTORY`         | Temp directory for uploads               | `/tmp/repolens/uploads` |
 | `LOG_LEVEL`                | Logging level                            | `INFO` |

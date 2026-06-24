@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.exceptions import ZipSecurityError
+from app.exceptions import UploadLimitError, ZipSecurityError
 from app.extract import safe_extract_zip
 
 
@@ -58,5 +58,5 @@ def test_rejects_oversized_member(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
     buffer.seek(0)
     with zipfile.ZipFile(buffer, "r") as archive:
-        with pytest.raises(ZipSecurityError, match="maximum file size"):
+        with pytest.raises(UploadLimitError, match="maximum size"):
             safe_extract_zip(archive, target)

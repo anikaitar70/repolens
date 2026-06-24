@@ -2,7 +2,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 from app.config import settings
-from app.exceptions import ZipSecurityError
+from app.exceptions import UploadLimitError, ZipSecurityError
 
 NESTED_ARCHIVE_EXTENSIONS = {".zip", ".tar", ".gz", ".tgz", ".bz2", ".7z", ".rar"}
 READ_CHUNK_SIZE = 64 * 1024
@@ -50,8 +50,10 @@ def safe_extract_zip(archive: zipfile.ZipFile, target_dir: Path) -> None:
     members = archive.infolist()
 
     if len(members) > settings.max_extracted_files:
-        raise ZipSecurityError(
-            f"Archive contains too many files (max {settings.max_extracted_files})."
+        raise UploadLimitError(
+            f"Repository has too many files ({len(members)}). "
+            f"Maximum is {settings.max_extracted_files}. "
+            "Exclude dependencies and build output before zipping."
         )
 
     declared_uncompressed = 0
@@ -70,14 +72,17 @@ def safe_extract_zip(archive: zipfile.ZipFile, target_dir: Path) -> None:
             raise ZipSecurityError("Archive contains unsafe file paths (zip-slip detected).")
 
         if member.file_size > settings.max_single_file_size:
-            raise ZipSecurityError(
-                f"Archive member exceeds maximum file size ({settings.max_single_file_size} bytes)."
+            raise UploadLimitError(
+                f"A file in the archive exceeds the maximum size "
+                f"({settings.max_single_file_size // (1024 * 1024)} MB per file)."
             )
 
         declared_uncompressed += member.file_size
         if declared_uncompressed > settings.max_extracted_size:
-            raise ZipSecurityError(
-                f"Archive exceeds maximum extracted size ({settings.max_extracted_size} bytes)."
+            raise UploadLimitError(
+                "Repository is too large when extracted. "
+                f"Maximum extracted size is {settings.max_extracted_size // (1024 * 1024)} MB. "
+                "Remove node_modules, .git, dist, or other generated folders."
             )
 
     total_written = 0
@@ -106,14 +111,17 @@ def safe_extract_zip(archive: zipfile.ZipFile, target_dir: Path) -> None:
 
                 if file_written > settings.max_single_file_size:
                     destination.unlink(missing_ok=True)
-                    raise ZipSecurityError(
-                        f"Extracted file exceeds maximum size ({settings.max_single_file_size} bytes)."
+                    raise UploadLimitError(
+                        f"A file in the archive exceeds the maximum size "
+                        f"({settings.max_single_file_size // (1024 * 1024)} MB per file)."
                     )
 
                 if total_written > settings.max_extracted_size:
                     destination.unlink(missing_ok=True)
-                    raise ZipSecurityError(
-                        f"Archive exceeds maximum extracted size ({settings.max_extracted_size} bytes)."
+                    raise UploadLimitError(
+                        "Repository is too large when extracted. "
+                        f"Maximum extracted size is {settings.max_extracted_size // (1024 * 1024)} MB. "
+                        "Remove node_modules, .git, dist, or other generated folders."
                     )
 
                 dest.write(chunk)

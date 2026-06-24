@@ -1,26 +1,55 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchUploadLimits, type UploadLimits } from "@/lib/api";
 
 interface UploadAreaProps {
   onUpload: (file: File) => void;
+  onError?: (message: string) => void;
   disabled?: boolean;
 }
 
-export default function UploadArea({ onUpload, disabled }: UploadAreaProps) {
+export default function UploadArea({ onUpload, onError, disabled }: UploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [limits, setLimits] = useState<UploadLimits | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchUploadLimits().then(setLimits);
+  }, []);
+
+  const reject = useCallback(
+    (message: string) => {
+      if (onError) {
+        onError(message);
+      } else {
+        alert(message);
+      }
+    },
+    [onError],
+  );
 
   const handleFile = useCallback(
     (file: File | undefined) => {
       if (!file || disabled) return;
       if (!file.name.toLowerCase().endsWith(".zip")) {
-        alert("Please upload a ZIP file.");
+        reject("Please upload a ZIP file.");
         return;
       }
+
+      const maxBytes = limits?.max_upload_bytes ?? 104_857_600;
+      if (file.size > maxBytes) {
+        const label = limits?.max_upload_label ?? "100 MB";
+        reject(
+          `ZIP is too large (${formatFileSize(file.size)}). Maximum upload size is ${label}. ` +
+            "Exclude node_modules, .git, dist, and other generated folders before zipping.",
+        );
+        return;
+      }
+
       onUpload(file);
     },
-    [onUpload, disabled]
+    [onUpload, disabled, limits, reject],
   );
 
   const onDrop = useCallback(
@@ -29,8 +58,10 @@ export default function UploadArea({ onUpload, disabled }: UploadAreaProps) {
       setIsDragging(false);
       handleFile(e.dataTransfer.files[0]);
     },
-    [handleFile]
+    [handleFile],
   );
+
+  const limitHint = limits?.max_upload_label ?? "100 MB";
 
   return (
     <div
@@ -75,8 +106,18 @@ export default function UploadArea({ onUpload, disabled }: UploadAreaProps) {
       </p>
       <p className="mt-1 text-sm text-slate-500">or click to browse</p>
       <p className="mt-3 text-xs text-slate-400">
-        Supports Python, JavaScript, and TypeScript
+        Supports Python, JavaScript, and TypeScript · max ZIP {limitHint}
       </p>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+  return `${bytes} bytes`;
 }

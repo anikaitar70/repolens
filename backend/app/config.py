@@ -21,13 +21,13 @@ class Settings(BaseSettings):
     large_function_threshold: int = 50
     complexity_threshold: int = 10
 
-    max_upload_size: int = Field(default=26_214_400, description="Max upload size in bytes (25 MB)")
+    max_upload_size: int = Field(default=104_857_600, description="Max upload size in bytes (100 MB)")
     max_extracted_size: int = Field(
-        default=104_857_600, description="Max total extracted size in bytes (100 MB)"
+        default=262_144_000, description="Max total extracted size in bytes (250 MB)"
     )
     max_extracted_files: int = Field(default=5_000, description="Max files in extracted archive")
     max_single_file_size: int = Field(
-        default=10_485_760, description="Max single extracted file size in bytes (10 MB)"
+        default=20_971_520, description="Max single extracted file size in bytes (20 MB)"
     )
     max_analysis_seconds: int = Field(default=120, description="Max analysis runtime in seconds")
     report_top_findings_limit: int = Field(

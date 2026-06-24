@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_MODELS,
   PROVIDER_LABELS,
   type AiProvider,
@@ -19,13 +20,20 @@ interface AiSettingsPanelProps {
 }
 
 export default function AiSettingsPanel({ onChange }: AiSettingsPanelProps) {
-  const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
+  const [settings, setSettings] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
+  const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
+    setSettings(loadAiSettings());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     onChange?.(settings);
-  }, [settings, onChange]);
+  }, [settings, onChange, hydrated]);
 
   const update = (partial: Partial<AiSettings>) => {
     const next = { ...settings, ...partial };
@@ -128,7 +136,7 @@ export default function AiSettingsPanel({ onChange }: AiSettingsPanelProps) {
         )}
       </div>
 
-      {!hasAiKey(settings) && (
+      {hydrated && !hasAiKey(settings) && (
         <p className="mt-3 text-sm text-slate-500">
           No API key configured — analysis will return an AI-ready prompt you can paste into ChatGPT,
           Claude, Gemini, or Grok.
