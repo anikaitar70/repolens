@@ -94,21 +94,37 @@ Then `docker exec yoga-nginx-1 nginx -s reload`.
 
 ### Still routes to nirvanayoga.org / wrong site
 
-The VPS can serve the correct cert while your browser still hits the wrong vhost if **`rl.anikait.page` appears in multiple nginx configs**. nginx uses the **first** matching `server_name` block when duplicates exist.
+The VPS can serve the correct HTTPS cert while HTTP still routes to nirvana if **`rl.anikait.page` is listed in `production-ssl.conf`**.
 
 ```bash
-# Find every config that mentions rl.anikait.page
+# Confirm the conflict (rl must only appear in repolens.conf)
 grep -rn "rl.anikait.page" /opt/yoga/nginx/conf.d/
+```
 
-# rl.anikait.page must ONLY be in repolens.conf — remove it from other files, e.g.:
-#   production-ssl.conf, initial.conf, *.bak
-nano /opt/yoga/nginx/conf.d/production-ssl.conf   # remove rl.anikait.page from server_name if present
+If you see this in `production-ssl.conf`:
+```nginx
+server_name yoga.anikait.page nirvanayoga.org www.nirvanayoga.org rl.anikait.page;
+```
 
-# Re-apply RepoLens config and reload
-cd /opt/repolens
-cp deploy/nginx/repolens-yoga.conf.example /opt/yoga/nginx/conf.d/repolens.conf
+Remove `rl.anikait.page` from that line:
+
+```bash
+sed -i 's/ rl\.anikait\.page//' /opt/yoga/nginx/conf.d/production-ssl.conf
+grep "server_name" /opt/yoga/nginx/conf.d/production-ssl.conf | head -3
+
 docker exec yoga-nginx-1 nginx -t
 docker exec yoga-nginx-1 nginx -s reload
+```
+
+You should no longer see:
+`conflicting server name "rl.anikait.page" on 0.0.0.0:80, ignored`
+
+Re-apply RepoLens config if needed:
+
+```bash
+cd /opt/repolens
+cp deploy/nginx/repolens-yoga.conf.example /opt/yoga/nginx/conf.d/repolens.conf
+docker exec yoga-nginx-1 nginx -t && docker exec yoga-nginx-1 nginx -s reload
 ```
 
 Run the bundled checker:
@@ -123,7 +139,7 @@ From your **local PC** (not VPS), also check DNS/IPv6:
 ```bash
 nslookup rl.anikait.page
 curl -4 -I https://rl.anikait.page/
-curl -6 -I https://rl.anikait.page/   # fails if no AAAA — good
+curl -4 -I http://rl.anikait.page/    # should 301 to https://rl.anikait.page/
 ```
 
 If local `curl -4` shows the wrong cert but VPS curl is correct, flush browser cache or test in incognito.
