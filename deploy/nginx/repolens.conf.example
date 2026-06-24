@@ -1,23 +1,17 @@
-# NEW nginx site for RepoLens only — does not modify your existing website config.
+# Nginx site for RepoLens at https://rl.anikait.page
+# Does not modify your existing website config.
 #
-# 1. Copy to the server:
-#    sudo cp deploy/nginx/repolens.conf.example /etc/nginx/sites-available/repolens
-# 2. Edit server_name and paths if needed
-# 3. Enable:
-#    sudo ln -s /etc/nginx/sites-available/repolens /etc/nginx/sites-enabled/repolens
-# 4. Test and reload:
-#    sudo nginx -t && sudo systemctl reload nginx
-# 5. SSL (new subdomain only):
-#    sudo certbot --nginx -d repolens.YOURDOMAIN.com
+#   sudo cp /opt/repolens/deploy/nginx/repolens.conf.example /etc/nginx/sites-available/repolens
+#   sudo ln -sf /etc/nginx/sites-available/repolens /etc/nginx/sites-enabled/repolens
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d rl.anikait.page
 
 server {
     listen 80;
-    server_name repolens.YOURDOMAIN.com;
+    server_name rl.anikait.page;
 
-    # Allow ZIP uploads up to 25 MB
     client_max_body_size 26m;
 
-    # RepoLens API (FastAPI on localhost:8010)
     location /api/ {
         proxy_pass http://127.0.0.1:8010/api/;
         proxy_http_version 1.1;
@@ -26,7 +20,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # BYOK AI headers (never logged by RepoLens backend)
         proxy_set_header X-AI-Provider $http_x_ai_provider;
         proxy_set_header X-AI-Model $http_x_ai_model;
         proxy_set_header X-AI-Api-Key $http_x_ai_api_key;
@@ -36,13 +29,11 @@ server {
         proxy_send_timeout 180s;
     }
 
-    # Health check (optional)
     location /health {
         proxy_pass http://127.0.0.1:8010/health;
         proxy_set_header Host $host;
     }
 
-    # RepoLens frontend (Next.js on localhost:3010)
     location / {
         proxy_pass http://127.0.0.1:3010;
         proxy_http_version 1.1;

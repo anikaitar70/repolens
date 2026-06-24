@@ -39,4 +39,4 @@ echo "==> Health check:"
 sleep 5
 curl -sf http://127.0.0.1:8010/health && echo " Backend OK" || echo " Backend not ready yet (may still be starting)"
 
-echo "Done. Future deploys: cd ~/repolens && ./deploy/deploy.sh"
+echo "Done. Future deploys: cd /opt/repolens && ./deploy/deploy.sh"
